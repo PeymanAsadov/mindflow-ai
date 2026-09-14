@@ -59,7 +59,7 @@ export default function Projects() {
                 <div>
                     <p className="text-xs sm:text-sm font-semibold text-[#16A34A]">AI suggestion</p>
                     <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
-                        Telegram botundan gələn məlumatlar əsasında yeniləndi.
+                        Updated based on data from the Telegram bot.
                     </p>
                 </div>
             </div>
@@ -91,7 +91,7 @@ export default function Projects() {
                     </div>
                 ))}
                 {projects.length === 0 && (
-                    <p className="text-xs text-gray-400 col-span-2 py-2">Heç bir layihə tapılmadı.</p>
+                    <p className="text-xs text-gray-400 col-span-2 py-2">No projects found.</p>
                 )}
             </div>
         </div>

@@ -122,7 +122,7 @@ export default function Dashboard() {
             <div className="flex-1 flex items-center justify-center h-full">
                 <div className="flex items-center gap-2 text-emerald-600">
                     <Loader2 className="animate-spin" size={24} />
-                    <span className="text-sm font-medium">Yüklənir...</span>
+                    <span className="text-sm font-medium">Loading...</span>
                 </div>
             </div>
         );
@@ -132,7 +132,7 @@ export default function Dashboard() {
         <div className="p-4 sm:p-6 md:p-10 w-full">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-gray-900">👋 Xoş gəldin, {firstName}</h1>
+                    <h1 className="text-xl md:text-2xl font-bold text-gray-900">👋 Welcome, {firstName}</h1>
                     <p className="text-xs md:text-sm text-gray-500 mt-1">Here's what Telegram bot synced for you today.</p>
                 </div>
                 <div className="text-xs md:text-sm font-medium text-gray-400">

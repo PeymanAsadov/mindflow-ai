@@ -17,8 +17,8 @@ export default function Sidebar() {
     const { user: apiUser } = useUser() || {};
 
     const sidebarItems = [
-        { label: 'İdarə paneli', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-        { label: 'Təqvim', path: '/calendar', icon: <Calendar size={20} /> },
+        { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
+        { label: 'Calendar', path: '/calendar', icon: <Calendar size={20} /> },
     ];
 
     const firstName = apiUser?.firstName || '';
