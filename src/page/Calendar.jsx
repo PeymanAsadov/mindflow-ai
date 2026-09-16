@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Calendar as CalendarIcon, ArrowLeft } from 'lucide-react';
 import { useUser } from '../UserContext';
@@ -60,16 +61,16 @@ const MOBILE_MAX_HEIGHT = 420;
 
 const EVENT_STYLES = {
     purple: { bg: '#F3E8FF', text: '#7C3AED' },
-    green:  { bg: '#DCFCE7', text: '#16A34A' },
-    blue:   { bg: '#DBEAFE', text: '#1D4ED8' },
-    amber:  { bg: '#FEF3C7', text: '#B45309' },
+    green: { bg: '#DCFCE7', text: '#16A34A' },
+    blue: { bg: '#DBEAFE', text: '#1D4ED8' },
+    amber: { bg: '#FEF3C7', text: '#B45309' },
 };
 
 const CATEGORY_COLOR = {
-    todo:     'green',
+    todo: 'green',
     projects: 'blue',
     meetings: 'purple',
-    notes:    'amber',
+    notes: 'amber',
 };
 
 // Parse "HH:MM" or "HH" string into a fractional hour number
@@ -90,11 +91,15 @@ function itemsToEvents(items) {
             const start = parseTime(item.fields?.time);
             const safeStart = start !== null ? start : 9; // default to 09:00 if no time
             return {
-                date:  item.fields.date,
+                date: item.fields.date,
                 start: safeStart,
-                end:   safeStart + 1,
+                end: safeStart + 1,
                 title: item.fields?.title || item.fields?.description || 'Event',
                 color: CATEGORY_COLOR[item.category] || 'purple',
+                time: item.fields?.time || '09:00',
+                participants: item.fields?.participants || 'Peyman Asadov',
+                location: item.fields?.location || 'Google Meet',
+                link: item.fields?.link || '#'
             };
         });
 }
@@ -120,7 +125,7 @@ function nowFraction() {
 
 // ---------- Week grid ----------
 
-function WeekGrid({ weekStart, events }) {
+function WeekGrid({ weekStart, events, onSelectEvent }) {
     const isMobile = useIsMobile();
     const hourHeight = isMobile ? HOUR_HEIGHT_MOBILE : HOUR_HEIGHT_DESKTOP;
     const scrollRef = useRef(null);
@@ -213,7 +218,8 @@ function WeekGrid({ weekStart, events }) {
                                     return (
                                         <div
                                             key={idx}
-                                            className="absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded-md sm:rounded-lg px-1 py-0.5 sm:px-2 sm:py-1 md:px-2.5 md:py-1.5 overflow-hidden shadow-sm transition-all hover:z-10 hover:shadow-md"
+                                            onClick={() => onSelectEvent(e)}
+                                            className="absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded-md sm:rounded-lg px-1 py-0.5 sm:px-2 sm:py-1 md:px-2.5 md:py-1.5 overflow-hidden shadow-sm transition-all hover:z-10 hover:shadow-md cursor-pointer"
                                             style={{ top, height, backgroundColor: style.bg, color: style.text }}
                                         >
                                             <p className="text-[8px] sm:text-[10px] md:text-[11px] font-semibold leading-tight truncate">{e.title}</p>
@@ -243,7 +249,7 @@ function WeekGrid({ weekStart, events }) {
 
 // ---------- Month view ----------
 
-function MonthGrid({ monthDate, events }) {
+function MonthGrid({ monthDate, events, onSelectEvent }) {
     const safeEvents = Array.isArray(events) ? events : [];
 
     const cells = useMemo(() => {
@@ -297,7 +303,11 @@ function MonthGrid({ monthDate, events }) {
 
                             <div className="space-y-0.5 md:space-y-1">
                                 {visible.map((e, idx) => (
-                                    <div key={idx} className="flex items-center gap-1 text-[10px] md:text-[11px] text-gray-600">
+                                    <div
+                                        key={idx}
+                                        onClick={() => onSelectEvent(e)}
+                                        className="flex items-center gap-1 text-[10px] md:text-[11px] text-gray-600 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition"
+                                    >
                                         <span
                                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                                             style={{ backgroundColor: EVENT_STYLES[e.color]?.text || '#7C3AED' }}
@@ -323,12 +333,112 @@ function MonthGrid({ monthDate, events }) {
     );
 }
 
+// ---------- Event modal (portal) ----------
+
+function EventModal({ event, onClose }) {
+    const navigate = useNavigate();
+
+    const handleOpenMeeting = () => {
+        onClose();
+        navigate('/meetings');
+    };
+
+    // ESC ilə bağlama + arxa fonun scroll-unu dayandırma
+    useEffect(() => {
+        const onKey = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', onKey);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.removeEventListener('keydown', onKey);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [onClose]);
+
+    if (!event) return null;
+
+    return createPortal(
+        <div
+            onClick={onClose}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px] mf-overlay-enter"
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                className="bg-white rounded-2xl p-6 w-full max-w-[420px] shadow-2xl relative mf-modal-enter"
+            >
+                <style>{`
+                    @keyframes mfOverlayIn { from { opacity: 0 } to { opacity: 1 } }
+                    @keyframes mfModalIn {
+                        from { opacity: 0; transform: translateY(8px) scale(.96) }
+                        to { opacity: 1; transform: translateY(0) scale(1) }
+                    }
+                    .mf-overlay-enter { animation: mfOverlayIn .16s ease-out }
+                    .mf-modal-enter { animation: mfModalIn .2s cubic-bezier(.16,1,.3,1) }
+                `}</style>
+
+                {/* Close Button */}
+                <button
+                    onClick={onClose}
+                    aria-label="Close"
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition"
+                >
+                    ✕
+                </button>
+
+                {/* Header & Title */}
+                <div className="flex items-center gap-3 mb-4 pr-6">
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 flex-shrink-0">
+                        📅
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 leading-snug">{event.title}</h3>
+                </div>
+
+                {/* Details List */}
+                <div className="space-y-3 text-sm text-gray-600 border-b border-gray-100 pb-5 mb-5">
+                    <div className="flex items-center gap-3">
+                        <span>📅</span>
+                        <span>{event.date}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span>🕒</span>
+                        <span>{formatRange(event.start, event.end)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span>👥</span>
+                        <span>{event.participants}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span>📍</span>
+                        <span>{event.location}</span>
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-3">
+                    <button
+                        onClick={handleOpenMeeting}
+                        className="px-5 py-2.5 text-sm bg-[#00C875] hover:bg-[#00b067] text-white rounded-xl font-medium shadow-md transition-colors inline-flex items-center justify-center"
+                    >
+                        Open meeting
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
 // ---------- Main page ----------
 
 export default function CalendarApp() {
     const navigate = useNavigate();
     const [currentView, setCurrentView] = useState('timeGridWeek');
     const [cursorDate, setCursorDate] = useState(REFERENCE_TODAY);
+    const [selectedEvent, setSelectedEvent] = useState(null);
 
     const { items } = useUser();
     const events = useMemo(() => itemsToEvents(items), [items]);
@@ -363,7 +473,7 @@ export default function CalendarApp() {
     };
 
     return (
-        <div className="flex min-h-screen bg-[#FAFAFB] font-sans justify-center">
+        <div className="flex min-h-screen bg-[#FAFAFB] font-sans justify-center relative">
             <div className="flex-1 max-w-7xl p-4 md:p-8">
                 <button
                     onClick={() => navigate('/dashboard')}
@@ -414,8 +524,8 @@ export default function CalendarApp() {
                         <button
                             onClick={() => setCurrentView('dayGridMonth')}
                             className={`px-3 py-1 md:px-4 md:py-1.5 text-xs md:text-sm font-medium rounded-lg transition ${currentView === 'dayGridMonth'
-                                    ? 'bg-white text-[#00C875] font-semibold shadow-sm'
-                                    : 'text-gray-400 hover:text-gray-600'
+                                ? 'bg-white text-[#00C875] font-semibold shadow-sm'
+                                : 'text-gray-400 hover:text-gray-600'
                                 }`}
                         >
                             Month
@@ -423,8 +533,8 @@ export default function CalendarApp() {
                         <button
                             onClick={() => setCurrentView('timeGridWeek')}
                             className={`px-3 py-1 md:px-4 md:py-1.5 text-xs md:text-sm font-medium rounded-lg transition ${currentView === 'timeGridWeek'
-                                    ? 'bg-white text-[#00C875] font-semibold shadow-sm'
-                                    : 'text-gray-400 hover:text-gray-600'
+                                ? 'bg-white text-[#00C875] font-semibold shadow-sm'
+                                : 'text-gray-400 hover:text-gray-600'
                                 }`}
                         >
                             Week
@@ -444,11 +554,16 @@ export default function CalendarApp() {
                     `}</style>
                     <div key={currentView} className="calendar-view-enter">
                         {currentView === 'timeGridWeek'
-                            ? <WeekGrid weekStart={weekStart} events={events} />
-                            : <MonthGrid monthDate={startOfMonth(cursorDate)} events={events} />}
+                            ? <WeekGrid weekStart={weekStart} events={events} onSelectEvent={setSelectedEvent} />
+                            : <MonthGrid monthDate={startOfMonth(cursorDate)} events={events} onSelectEvent={setSelectedEvent} />}
                     </div>
                 </div>
             </div>
+
+            {/* Event Details Modal — body-yə portal olunur, sidebar daxil bütün ekranı örtür */}
+            {selectedEvent && (
+                <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+            )}
         </div>
     );
 }

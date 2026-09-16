@@ -72,13 +72,13 @@ export default function Dashboard() {
 
     const safeItems = Array.isArray(items) ? items : [];
 
-    const todosCount    = safeItems.filter(i => i.category === 'todo').length;
+    const todosCount = safeItems.filter(i => i.category === 'todo').length;
     const projectsCount = safeItems.filter(i => i.category === 'projects').length;
     const meetingsCount = safeItems.filter(i => i.category === 'meetings').length;
-    const notesCount    = safeItems.filter(i => i.category === 'notes').length;
+    const notesCount = safeItems.filter(i => i.category === 'notes').length;
 
     const firstName = user?.firstName || 'there';
-    const summary   = buildSummary(safeItems);
+    const summary = buildSummary(safeItems);
 
     const handleAskSubmit = async (queryText) => {
         const textToAsk = queryText || question;
@@ -107,6 +107,7 @@ export default function Dashboard() {
             const data = await response.json();
             if (response.ok && data.ok) {
                 setAskAnswer(data.answer);
+                setQuestion(''); // <-- Inputu təmizləmək üçün buraya əlavə olundu
             } else {
                 setAskError(data.error || 'Sualı cavablandırarkən xəta baş verdi.');
             }
