@@ -10,7 +10,9 @@ import {
     Sparkles,
     Loader2,
     Paperclip,
-    ArrowUp
+    ArrowUp,
+    Edit2,
+    Check
 } from 'lucide-react';
 
 function formatToday() {
@@ -56,8 +58,24 @@ function buildSummary(items) {
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const { user, items, loading, error } = useUser();
+    const { user, items, loading, error, updateUser } = useUser();
     const [currentDate, setCurrentDate] = useState(formatToday());
+
+    // Profile Editing
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [editFirstName, setEditFirstName] = useState('');
+
+    const handleEditProfile = () => {
+        setEditFirstName(user?.firstName || '');
+        setIsEditingProfile(true);
+    };
+
+    const handleSaveProfile = async () => {
+        if (updateUser) {
+            await updateUser({ firstName: editFirstName, lastName: user?.lastName || '' });
+        }
+        setIsEditingProfile(false);
+    };
 
     // Ask Mind states
     const [question, setQuestion] = useState('');
@@ -133,7 +151,28 @@ export default function Dashboard() {
         <div className="p-4 sm:p-6 md:p-10 w-full">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-gray-900">👋 Welcome, {firstName}</h1>
+                    <div className="flex items-center gap-3">
+                        {isEditingProfile ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl md:text-2xl font-bold text-gray-900">👋 Welcome,</span>
+                                <input 
+                                    value={editFirstName}
+                                    onChange={(e) => setEditFirstName(e.target.value)}
+                                    className="text-xl md:text-2xl font-bold text-gray-900 w-32 border border-gray-200 rounded px-1.5 outline-none focus:border-emerald-500"
+                                    autoFocus
+                                />
+                            </div>
+                        ) : (
+                            <h1 className="text-xl md:text-2xl font-bold text-gray-900">👋 Welcome, {firstName}</h1>
+                        )}
+                        <button
+                            onClick={isEditingProfile ? handleSaveProfile : handleEditProfile}
+                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isEditingProfile ? 'text-emerald-600 bg-emerald-50' : 'text-gray-400 hover:text-emerald-600 hover:bg-gray-50'}`}
+                            title={isEditingProfile ? "Save Name" : "Edit Name"}
+                        >
+                            {isEditingProfile ? <Check size={18} /> : <Edit2 size={18} />}
+                        </button>
+                    </div>
                     <p className="text-xs md:text-sm text-gray-500 mt-1">Here's what Telegram bot synced for you today.</p>
                 </div>
                 <div className="text-xs md:text-sm font-medium text-gray-400">

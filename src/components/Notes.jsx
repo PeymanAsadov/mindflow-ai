@@ -1,13 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../UserContext';
-import { FileText, ChevronLeft, Loader2 } from 'lucide-react';
+import { FileText, ChevronLeft, Loader2, Edit2, Check } from 'lucide-react';
 
 export default function Notes() {
     const navigate = useNavigate();
-    const { items, loading, error } = useUser();
+    const { items, loading, error, updateItem } = useUser();
+    const [editingId, setEditingId] = useState(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [editContent, setEditContent] = useState('');
 
     const rawNotes = Array.isArray(items) ? items.filter(i => i.category === 'notes') : [];
+
+    const handleEdit = (note) => {
+        setEditingId(note.id);
+        setEditTitle(note.title);
+        setEditContent(note.content);
+    };
+
+    const handleSave = async (id) => {
+        const rawNote = rawNotes.find(i => i.id === id);
+        if (updateItem && rawNote) {
+            await updateItem(id, { 
+                ...rawNote, 
+                fields: { 
+                    ...rawNote.fields, 
+                    title: editTitle, 
+                    description: editContent 
+                }
+            });
+        }
+        setEditingId(null);
+    };
 
     const notes = rawNotes.map((item, idx) => ({
         id:          item.id,
@@ -78,14 +102,39 @@ export default function Notes() {
                                         className={`p-4 sm:p-6 transition hover:bg-gray-50/50 ${note.highlighted ? 'bg-[#FFFAEC]/30' : ''} ${nIndex !== section.notes.length - 1 ? 'border-b border-gray-100' : ''}`}
                                     >
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2 mb-2">
-                                            <h3 className={`font-bold text-sm sm:text-base ${note.highlighted ? 'text-amber-700' : 'text-gray-900'}`}>
-                                                {note.title}
-                                            </h3>
-                                            <span className="text-xs font-medium text-gray-400 flex-shrink-0">
-                                                {note.date}
-                                            </span>
+                                            {editingId === note.id ? (
+                                                <input 
+                                                    value={editTitle} 
+                                                    onChange={e => setEditTitle(e.target.value)} 
+                                                    className="font-bold text-sm sm:text-base w-full border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-amber-500"
+                                                />
+                                            ) : (
+                                                <h3 className={`font-bold text-sm sm:text-base ${note.highlighted ? 'text-amber-700' : 'text-gray-900'}`}>
+                                                    {note.title}
+                                                </h3>
+                                            )}
+                                            <div className="flex items-center gap-2 flex-shrink-0 mt-1 sm:mt-0">
+                                                <span className="text-xs font-medium text-gray-400">
+                                                    {note.date}
+                                                </span>
+                                                <button
+                                                    onClick={() => editingId === note.id ? handleSave(note.id) : handleEdit(note)}
+                                                    className="p-1 text-gray-400 hover:text-amber-600 transition rounded hover:bg-amber-50"
+                                                    title={editingId === note.id ? "Save Note" : "Edit Note"}
+                                                >
+                                                    {editingId === note.id ? <Check size={14} /> : <Edit2 size={14} />}
+                                                </button>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-gray-500 leading-relaxed">{note.content}</p>
+                                        {editingId === note.id ? (
+                                            <textarea 
+                                                value={editContent} 
+                                                onChange={e => setEditContent(e.target.value)} 
+                                                className="text-xs text-gray-700 w-full border border-gray-200 rounded px-1.5 py-1 outline-none focus:border-amber-500 h-20 resize-none mt-1"
+                                            />
+                                        ) : (
+                                            <p className="text-xs text-gray-500 leading-relaxed">{note.content}</p>
+                                        )}
                                     </div>
                                 ))
                             )}

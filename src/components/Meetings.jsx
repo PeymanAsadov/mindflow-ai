@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../UserContext';
-import { Users, Clock, MapPin, Sparkles, ChevronLeft, Loader2 } from 'lucide-react';
+import { Users, Clock, MapPin, Sparkles, ChevronLeft, Loader2, Edit2, Check } from 'lucide-react';
 
 function groupByDate(meetings) {
     const today = new Date();
@@ -33,9 +33,43 @@ function groupByDate(meetings) {
 
 export default function Meetings() {
     const navigate = useNavigate();
-    const { items, loading, error } = useUser();
+    const { items, loading, error, updateItem } = useUser();
+
+    const [editingId, setEditingId] = useState(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [editDate, setEditDate] = useState('');
+    const [editTime, setEditTime] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+    const [editLocation, setEditLocation] = useState('');
 
     const rawMeetings = Array.isArray(items) ? items.filter(i => i.category === 'meetings') : [];
+
+    const handleEdit = (meeting) => {
+        setEditingId(meeting.id);
+        setEditTitle(meeting.title);
+        setEditDate(meeting.date);
+        setEditTime(meeting.time);
+        setEditDescription(meeting.description);
+        setEditLocation(meeting.location === '—' ? '' : meeting.location);
+    };
+
+    const handleSave = async (id) => {
+        const rawMeeting = rawMeetings.find(i => i.id === id);
+        if (updateItem && rawMeeting) {
+            await updateItem(id, {
+                ...rawMeeting,
+                fields: {
+                    ...rawMeeting.fields,
+                    title: editTitle,
+                    date: editDate,
+                    time: editTime,
+                    description: editDescription,
+                    location: editLocation
+                }
+            });
+        }
+        setEditingId(null);
+    };
 
     const mapped = rawMeetings.map(item => ({
         id:          item.id,
@@ -115,20 +149,74 @@ export default function Meetings() {
                                         className={`p-4 sm:p-6 transition hover:bg-gray-50/50 ${mIndex !== section.meetings.length - 1 ? 'border-b border-gray-100' : ''}`}
                                     >
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2 mb-2">
-                                            <h3 className="font-bold text-gray-900 text-sm sm:text-base">{meeting.title}</h3>
-                                            <span className="text-xs font-medium text-gray-400 flex items-center gap-1 flex-shrink-0">
-                                                <Clock size={13} />
-                                                {meeting.date}{meeting.time ? ' · ' + meeting.time : ''}
-                                            </span>
+                                            <div className="w-full">
+                                                {editingId === meeting.id ? (
+                                                    <input 
+                                                        value={editTitle}
+                                                        onChange={e => setEditTitle(e.target.value)}
+                                                        className="font-bold text-gray-900 text-sm sm:text-base w-full border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-purple-600 mb-1"
+                                                    />
+                                                ) : (
+                                                    <h3 className="font-bold text-gray-900 text-sm sm:text-base">{meeting.title}</h3>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-shrink-0 mt-1 sm:mt-0">
+                                                {editingId === meeting.id ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input 
+                                                            value={editDate}
+                                                            onChange={e => setEditDate(e.target.value)}
+                                                            placeholder="YYYY-MM-DD"
+                                                            className="text-xs font-medium w-20 sm:w-24 border border-gray-200 rounded px-1 outline-none focus:border-purple-600"
+                                                        />
+                                                        <input 
+                                                            value={editTime}
+                                                            onChange={e => setEditTime(e.target.value)}
+                                                            placeholder="HH:MM"
+                                                            className="text-xs font-medium w-12 sm:w-16 border border-gray-200 rounded px-1 outline-none focus:border-purple-600"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
+                                                        <Clock size={13} />
+                                                        {meeting.date}{meeting.time ? ' · ' + meeting.time : ''}
+                                                    </span>
+                                                )}
+                                                <button
+                                                    onClick={() => editingId === meeting.id ? handleSave(meeting.id) : handleEdit(meeting)}
+                                                    className="p-1 text-gray-400 hover:text-purple-600 transition rounded hover:bg-purple-50"
+                                                    title={editingId === meeting.id ? "Save Meeting" : "Edit Meeting"}
+                                                >
+                                                    {editingId === meeting.id ? <Check size={14} /> : <Edit2 size={14} />}
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {meeting.description && (
-                                            <p className="text-xs text-gray-500 leading-relaxed mb-4">{meeting.description}</p>
+                                        {editingId === meeting.id ? (
+                                            <textarea 
+                                                value={editDescription}
+                                                onChange={e => setEditDescription(e.target.value)}
+                                                placeholder="Description..."
+                                                className="text-xs text-gray-700 w-full border border-gray-200 rounded px-1.5 py-1 outline-none focus:border-purple-600 h-16 resize-none mb-3"
+                                            />
+                                        ) : (
+                                            meeting.description && (
+                                                <p className="text-xs text-gray-500 leading-relaxed mb-4">{meeting.description}</p>
+                                            )
                                         )}
 
                                         <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
                                             <MapPin size={13} className="text-emerald-500 flex-shrink-0" />
-                                            <span className="truncate">{meeting.location}</span>
+                                            {editingId === meeting.id ? (
+                                                <input 
+                                                    value={editLocation}
+                                                    onChange={e => setEditLocation(e.target.value)}
+                                                    placeholder="Location"
+                                                    className="border border-gray-200 rounded px-1 outline-none focus:border-purple-600 text-gray-700 w-full max-w-[200px]"
+                                                />
+                                            ) : (
+                                                <span className="truncate">{meeting.location}</span>
+                                            )}
                                         </div>
                                     </div>
                                 ))

@@ -14,3 +14,15 @@ export async function getAllItems(email) {
     const raw = res.data?.items;
     return Array.isArray(raw) ? raw : [];
 }
+
+// Update user profile by gmail
+export async function updateUser(email, data) {
+    const res = await axios.put(`${BASE}/api/users`, data, { params: { gmail: email } });
+    return res.data;
+}
+
+// Update specific item by itemId
+export async function updateItem(email, itemId, data) {
+    const res = await axios.put(`${BASE}/api/items/${itemId}`, data, { params: { gmail: email } });
+    return res.data;
+}

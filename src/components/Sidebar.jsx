@@ -7,14 +7,19 @@ import {
     Calendar,
     LogOut,
     Menu,
-    X
+    X,
+    Edit2,
+    Check
 } from 'lucide-react';
 
 export default function Sidebar() {
     const navigate = useNavigate();
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
-    const { user: apiUser } = useUser() || {};
+    const { user: apiUser, updateUser } = useUser() || {};
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [editFirstName, setEditFirstName] = useState('');
+    const [editLastName, setEditLastName] = useState('');
 
     const sidebarItems = [
         { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
@@ -36,6 +41,19 @@ export default function Sidebar() {
     const handleItemClick = (path) => {
         navigate(path);
         setMobileOpen(false);
+    };
+
+    const handleEditClick = () => {
+        setEditFirstName(apiUser?.firstName || '');
+        setEditLastName(apiUser?.lastName || '');
+        setIsEditingProfile(true);
+    };
+
+    const handleSaveClick = async () => {
+        if (updateUser) {
+            await updateUser({ firstName: editFirstName, lastName: editLastName });
+        }
+        setIsEditingProfile(false);
     };
 
     return (
@@ -115,14 +133,42 @@ export default function Sidebar() {
 
                 {/* Profil və Log out hissəsi */}
                 <div className="space-y-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center gap-3 px-2">
+                    <div className="flex items-center gap-2 px-2">
                         <div className="w-10 h-10 rounded-full bg-[#EBFBF0] text-[#00C875] flex items-center justify-center font-bold text-sm flex-shrink-0">
                             {user.initials}
                         </div>
-                        <div className="overflow-hidden">
-                            <h4 className="text-sm font-bold text-gray-900 truncate">{user.name}</h4>
-                            <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                        <div className="overflow-hidden flex-1">
+                            {isEditingProfile ? (
+                                <div className="flex flex-col gap-1">
+                                    <input 
+                                        type="text" 
+                                        value={editFirstName} 
+                                        onChange={(e) => setEditFirstName(e.target.value)} 
+                                        className="text-sm font-bold text-gray-900 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
+                                        placeholder="First Name"
+                                    />
+                                    <input 
+                                        type="text" 
+                                        value={editLastName} 
+                                        onChange={(e) => setEditLastName(e.target.value)} 
+                                        className="text-xs text-gray-700 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
+                                        placeholder="Last Name"
+                                    />
+                                </div>
+                            ) : (
+                                <>
+                                    <h4 className="text-sm font-bold text-gray-900 truncate">{user.name}</h4>
+                                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                                </>
+                            )}
                         </div>
+                        <button
+                            onClick={isEditingProfile ? handleSaveClick : handleEditClick}
+                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isEditingProfile ? 'text-[#00C875] bg-[#EBFBF0]' : 'text-gray-400 hover:text-[#00C875] hover:bg-gray-50'}`}
+                            title={isEditingProfile ? "Save Profile" : "Edit Profile"}
+                        >
+                            {isEditingProfile ? <Check size={16} /> : <Edit2 size={16} />}
+                        </button>
                     </div>
 
                     <button

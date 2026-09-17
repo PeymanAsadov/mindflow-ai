@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Calendar as CalendarIcon, ArrowLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, ArrowLeft, Edit2, Check } from 'lucide-react';
 import { useUser } from '../UserContext';
 
 // ---------- Date helpers ----------
@@ -91,6 +91,7 @@ function itemsToEvents(items) {
             const start = parseTime(item.fields?.time);
             const safeStart = start !== null ? start : 9; // default to 09:00 if no time
             return {
+                id: item.id,
                 date: item.fields.date,
                 start: safeStart,
                 end: safeStart + 1,
@@ -337,6 +338,33 @@ function MonthGrid({ monthDate, events, onSelectEvent }) {
 
 function EventModal({ event, onClose }) {
     const navigate = useNavigate();
+    const { updateItem, items } = useUser();
+    const [isEditing, setIsEditing] = useState(false);
+    
+    const [editTitle, setEditTitle] = useState(event?.title || '');
+    const [editDate, setEditDate] = useState(event?.date || '');
+    const [editTime, setEditTime] = useState(event?.time || '');
+    const [editParticipants, setEditParticipants] = useState(event?.participants || '');
+    const [editLocation, setEditLocation] = useState(event?.location || '');
+
+    const handleSave = async () => {
+        if (!event?.id) return;
+        const rawItem = (items || []).find(i => i.id === event.id);
+        if (updateItem && rawItem) {
+            await updateItem(event.id, {
+                ...rawItem,
+                fields: {
+                    ...rawItem.fields,
+                    title: editTitle,
+                    date: editDate,
+                    time: editTime,
+                    participants: editParticipants,
+                    location: editLocation
+                }
+            });
+        }
+        setIsEditing(false);
+    };
 
     const handleOpenMeeting = () => {
         onClose();
@@ -394,31 +422,62 @@ function EventModal({ event, onClose }) {
                     <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 flex-shrink-0">
                         📅
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800 leading-snug">{event.title}</h3>
+                    {isEditing ? (
+                        <input 
+                            value={editTitle} 
+                            onChange={e => setEditTitle(e.target.value)}
+                            className="text-xl font-bold text-gray-800 leading-snug w-full border border-gray-200 rounded px-1.5 focus:outline-none focus:border-purple-600 cursor-text"
+                        />
+                    ) : (
+                        <h3 className="text-xl font-bold text-gray-800 leading-snug">{editTitle}</h3>
+                    )}
                 </div>
 
                 {/* Details List */}
                 <div className="space-y-3 text-sm text-gray-600 border-b border-gray-100 pb-5 mb-5">
                     <div className="flex items-center gap-3">
                         <span>📅</span>
-                        <span>{event.date}</span>
+                        {isEditing ? (
+                            <input value={editDate} onChange={e => setEditDate(e.target.value)} className="border border-gray-200 rounded px-1 flex-1 focus:outline-none focus:border-purple-600" placeholder="YYYY-MM-DD" />
+                        ) : (
+                            <span>{editDate}</span>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <span>🕒</span>
-                        <span>{formatRange(event.start, event.end)}</span>
+                        {isEditing ? (
+                            <input value={editTime} onChange={e => setEditTime(e.target.value)} className="border border-gray-200 rounded px-1 flex-1 focus:outline-none focus:border-purple-600" placeholder="HH:MM" />
+                        ) : (
+                            <span>{editTime || formatRange(event.start, event.end)}</span>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <span>👥</span>
-                        <span>{event.participants}</span>
+                        {isEditing ? (
+                            <input value={editParticipants} onChange={e => setEditParticipants(e.target.value)} className="border border-gray-200 rounded px-1 flex-1 focus:outline-none focus:border-purple-600" />
+                        ) : (
+                            <span>{editParticipants}</span>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <span>📍</span>
-                        <span>{event.location}</span>
+                        {isEditing ? (
+                            <input value={editLocation} onChange={e => setEditLocation(e.target.value)} className="border border-gray-200 rounded px-1 flex-1 focus:outline-none focus:border-purple-600" />
+                        ) : (
+                            <span>{editLocation}</span>
+                        )}
                     </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end gap-3">
+                <div className="flex items-center justify-between gap-3">
+                    <button
+                        onClick={isEditing ? handleSave : () => setIsEditing(true)}
+                        className={`px-4 py-2 text-sm rounded-xl font-medium transition-colors inline-flex items-center justify-center gap-2 ${isEditing ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : 'text-gray-500 hover:bg-gray-100'}`}
+                    >
+                        {isEditing ? <Check size={16} /> : <Edit2 size={16} />}
+                        {isEditing ? "Save Event" : "Edit Event"}
+                    </button>
                     <button
                         onClick={handleOpenMeeting}
                         className="px-5 py-2.5 text-sm bg-[#00C875] hover:bg-[#00b067] text-white rounded-xl font-medium shadow-md transition-colors inline-flex items-center justify-center"
