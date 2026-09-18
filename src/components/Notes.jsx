@@ -52,7 +52,7 @@ export default function Notes() {
             <div className="flex-1 flex items-center justify-center h-full">
                 <div className="flex items-center gap-2 text-amber-500">
                     <Loader2 className="animate-spin" size={24} />
-                    <span className="text-sm font-medium">Qeydlər yüklənir...</span>
+                    <span className="text-sm font-medium">Notes loading...</span>
                 </div>
             </div>
         );

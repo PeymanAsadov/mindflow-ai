@@ -83,7 +83,7 @@ export default function TodoList() {
             <div className="flex-1 flex items-center justify-center bg-[#F8F9FC] h-full">
                 <div className="flex items-center gap-2 text-emerald-600">
                     <Loader2 className="animate-spin" size={24} />
-                    <span className="text-sm font-medium">Tapşırıqlar yüklənir...</span>
+                    <span className="text-sm font-medium">Projects loading...</span>
                 </div>
             </div>
         );
