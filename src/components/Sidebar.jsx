@@ -20,6 +20,7 @@ export default function Sidebar() {
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [editFirstName, setEditFirstName] = useState('');
     const [editLastName, setEditLastName] = useState('');
+    const [editEmail, setEditEmail] = useState('');
 
     const sidebarItems = [
         { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
@@ -46,12 +47,18 @@ export default function Sidebar() {
     const handleEditClick = () => {
         setEditFirstName(apiUser?.firstName || '');
         setEditLastName(apiUser?.lastName || '');
+        setEditEmail(apiUser?.gmail || localStorage.getItem('mindflow_user_email') || '');
         setIsEditingProfile(true);
     };
 
     const handleSaveClick = async () => {
         if (updateUser) {
-            await updateUser({ firstName: editFirstName, lastName: editLastName });
+            await updateUser({ firstName: editFirstName, lastName: editLastName, gmail: editEmail });
+            // Additionally update the fallback local email if it's the primary tracker,
+            // though UserContext handles full persistence already.
+            if (editEmail) {
+                localStorage.setItem('mindflow_user_email', editEmail);
+            }
         }
         setIsEditingProfile(false);
     };
@@ -153,6 +160,13 @@ export default function Sidebar() {
                                         onChange={(e) => setEditLastName(e.target.value)} 
                                         className="text-xs text-gray-700 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
                                         placeholder="Last Name"
+                                    />
+                                    <input 
+                                        type="email" 
+                                        value={editEmail} 
+                                        onChange={(e) => setEditEmail(e.target.value)} 
+                                        className="text-xs text-gray-500 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
+                                        placeholder="Email Address"
                                     />
                                 </div>
                             ) : (

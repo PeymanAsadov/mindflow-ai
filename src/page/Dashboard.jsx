@@ -125,7 +125,7 @@ export default function Dashboard() {
             const data = await response.json();
             if (response.ok && data.ok) {
                 setAskAnswer(data.answer);
-                setQuestion(''); // <-- Inputu təmizləmək üçün buraya əlavə olundu
+                setQuestion(''); 
             } else {
                 setAskError(data.error || 'Sualı cavablandırarkən xəta baş verdi.');
             }
@@ -155,7 +155,7 @@ export default function Dashboard() {
                         {isEditingProfile ? (
                             <div className="flex items-center gap-2">
                                 <span className="text-xl md:text-2xl font-bold text-gray-900">👋 Welcome,</span>
-                                <input 
+                                <input
                                     value={editFirstName}
                                     onChange={(e) => setEditFirstName(e.target.value)}
                                     className="text-xl md:text-2xl font-bold text-gray-900 w-32 border border-gray-200 rounded px-1.5 outline-none focus:border-emerald-500"
@@ -186,7 +186,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* AI Gündəlik Xülasəsi */}
+            {/* AI daily */}
             <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100/40 rounded-3xl p-5 sm:p-6 md:p-8 border border-orange-100/60 relative mb-6 md:mb-8 shadow-sm">
                 <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold">
                     <Sparkles size={12} />
@@ -197,7 +197,7 @@ export default function Dashboard() {
                     <div className="flex-1 w-full">
                         <div className="flex items-center gap-2 text-amber-500 mb-2 sm:mb-3 font-semibold text-xs sm:text-sm">
                             <Sparkles size={16} />
-                            <span>AI Gündəlik Xülasəsi</span>
+                            <span>AI Daily Summary</span>
                         </div>
 
                         <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2">{summary.title}</h3>

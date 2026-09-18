@@ -7,8 +7,7 @@ export function useSyncedData(keyName) {
     useEffect(() => {
         const handleUpdate = () => setData(getData(keyName));
         window.addEventListener('storage_updated', handleUpdate);
-        window.addEventListener('storage', handleUpdate); // Digər tab-lardan gələn dəyişikliklər üçün
-
+        window.addEventListener('storage', handleUpdate); 
         return () => {
             window.removeEventListener('storage_updated', handleUpdate);
             window.removeEventListener('storage', handleUpdate);

@@ -11,13 +11,13 @@ function groupByDate(meetings) {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    const todayMeetings    = meetings.filter(m => m.date === todayStr);
+    const todayMeetings = meetings.filter(m => m.date === todayStr);
     const tomorrowMeetings = meetings.filter(m => m.date === tomorrowStr);
     const upcomingMeetings = meetings.filter(m => m.date !== todayStr && m.date !== tomorrowStr);
 
     const sections = [];
     if (todayMeetings.length > 0 || meetings.length === 0) {
-        sections.push({ title: 'Today',    count: `${todayMeetings.length} meetings`,    meetings: todayMeetings });
+        sections.push({ title: 'Today', count: `${todayMeetings.length} meetings`, meetings: todayMeetings });
     }
     if (tomorrowMeetings.length > 0) {
         sections.push({ title: 'Tomorrow', count: `${tomorrowMeetings.length} meetings`, meetings: tomorrowMeetings });
@@ -72,19 +72,19 @@ export default function Meetings() {
     };
 
     const mapped = rawMeetings.map(item => ({
-        id:          item.id,
-        title:       item.fields?.title       || 'Meeting',
-        date:        item.fields?.date        || '',
-        time:        item.fields?.time        || '',
+        id: item.id,
+        title: item.fields?.title || 'Meeting',
+        date: item.fields?.date || '',
+        time: item.fields?.time || '',
         description: item.fields?.description || '',
-        location:    item.fields?.location    || '—',
+        location: item.fields?.location || '—',
     }));
 
     const meetingSections = groupByDate(mapped);
 
     const aiSuggestion = mapped.length > 0
-        ? `Telegram botundan ${mapped.length} görüş sinxronlaşdırıldı.`
-        : 'Hələ heç bir görüş yoxdur. Telegram bot vasitəsilə görüş əlavə edin.';
+        ? `${mapped.length} ${mapped.length === 1 ? 'meeting' : 'meetings'} synchronized from Telegram bot.`
+        : 'No meetings found yet. Add meetings via Telegram bot.';
 
     if (loading) {
         return (
@@ -114,7 +114,7 @@ export default function Meetings() {
                     </div>
                     <div>
                         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meetings</h1>
-                        <p className="text-xs text-gray-400 mt-0.5">Dinamik olaraq yenilənir - MindFlow</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Dynamically updated — MindFlow</p>
                     </div>
                 </div>
             </div>
@@ -151,7 +151,7 @@ export default function Meetings() {
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2 mb-2">
                                             <div className="w-full">
                                                 {editingId === meeting.id ? (
-                                                    <input 
+                                                    <input
                                                         value={editTitle}
                                                         onChange={e => setEditTitle(e.target.value)}
                                                         className="font-bold text-gray-900 text-sm sm:text-base w-full border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-purple-600 mb-1"
@@ -163,13 +163,13 @@ export default function Meetings() {
                                             <div className="flex items-center gap-2 flex-shrink-0 mt-1 sm:mt-0">
                                                 {editingId === meeting.id ? (
                                                     <div className="flex items-center gap-1">
-                                                        <input 
+                                                        <input
                                                             value={editDate}
                                                             onChange={e => setEditDate(e.target.value)}
                                                             placeholder="YYYY-MM-DD"
                                                             className="text-xs font-medium w-20 sm:w-24 border border-gray-200 rounded px-1 outline-none focus:border-purple-600"
                                                         />
-                                                        <input 
+                                                        <input
                                                             value={editTime}
                                                             onChange={e => setEditTime(e.target.value)}
                                                             placeholder="HH:MM"
@@ -193,7 +193,7 @@ export default function Meetings() {
                                         </div>
 
                                         {editingId === meeting.id ? (
-                                            <textarea 
+                                            <textarea
                                                 value={editDescription}
                                                 onChange={e => setEditDescription(e.target.value)}
                                                 placeholder="Description..."
@@ -208,7 +208,7 @@ export default function Meetings() {
                                         <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
                                             <MapPin size={13} className="text-emerald-500 flex-shrink-0" />
                                             {editingId === meeting.id ? (
-                                                <input 
+                                                <input
                                                     value={editLocation}
                                                     onChange={e => setEditLocation(e.target.value)}
                                                     placeholder="Location"

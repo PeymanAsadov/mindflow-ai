@@ -5,7 +5,6 @@ export default function ScrollToTop() {
     const { pathname } = useLocation();
 
     useEffect(() => {
-        // Main elementinə class və ya ID verərək onu yuxarı dartırıq
         const mainContainer = document.querySelector('main');
         if (mainContainer) {
             mainContainer.scrollTo(0, 0);

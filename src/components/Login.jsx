@@ -6,7 +6,6 @@ export default function LoginPage({ onLoginSuccess }) {
     const login = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             try {
-                // Fetch the user's profile from Google to capture their email
                 const userInfo = await axios.get(
                     'https://www.googleapis.com/oauth2/v3/userinfo',
                     { headers: { Authorization: `Bearer ${tokenResponse.access_token}` } }

@@ -18,10 +18,25 @@ export function UserProvider({ children }) {
                 if (!isBackground) setLoading(false);
                 return;
             }
-            const [userData, itemsData] = await Promise.all([
+            let [userData, itemsData] = await Promise.all([
                 getUser(email),
                 getAllItems(email),
             ]);
+            
+            try {
+                const localUserUpdates = JSON.parse(localStorage.getItem('mindflow_user_updates')) || {};
+                if (userData) {
+                    userData = { ...userData, ...localUserUpdates };
+                }
+                
+                const localItemUpdates = JSON.parse(localStorage.getItem('mindflow_item_updates')) || {};
+                let mergedItems = Array.isArray(itemsData) ? itemsData : [];
+                mergedItems = mergedItems.map(i => localItemUpdates[i.id] ? { ...i, ...localItemUpdates[i.id] } : i);
+                itemsData = mergedItems;
+            } catch (e) {
+                console.error('Error merging local state', e);
+            }
+
             setUser(userData);
             setItems(Array.isArray(itemsData) ? itemsData : []);
         } catch (err) {
@@ -42,16 +57,43 @@ export function UserProvider({ children }) {
 
     const handleUpdateUser = async (data) => {
         const email = localStorage.getItem('mindflow_user_email') || '';
+        
+        setUser(prev => ({ ...prev, ...data }));
+        try {
+            const local = JSON.parse(localStorage.getItem('mindflow_user_updates')) || {};
+            localStorage.setItem('mindflow_user_updates', JSON.stringify({ ...local, ...data }));
+        } catch (e) {
+            console.error('Error saving user update to local', e);
+        }
+
         if (email) {
-            await updateUser(email, data);
+            try {
+                await updateUser(email, data);
+            } catch (err) {
+                console.error('Failed to sync user to backend', err);
+            }
             await fetchAll(true);
         }
     };
 
     const handleUpdateItem = async (itemId, data) => {
         const email = localStorage.getItem('mindflow_user_email') || '';
+        
+        setItems(prev => prev.map(i => i.id === itemId ? { ...i, ...data } : i));
+        try {
+            const local = JSON.parse(localStorage.getItem('mindflow_item_updates')) || {};
+            local[itemId] = { ...(local[itemId] || {}), ...data };
+            localStorage.setItem('mindflow_item_updates', JSON.stringify(local));
+        } catch (e) {
+            console.error('Error saving item update to local', e);
+        }
+
         if (email) {
-            await updateItem(email, itemId, data);
+            try {
+                await updateItem(email, itemId, data);
+            } catch (err) {
+                console.error('Failed to sync item to backend', err);
+            }
             await fetchAll(true);
         }
     };

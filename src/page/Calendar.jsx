@@ -371,7 +371,6 @@ function EventModal({ event, onClose }) {
         navigate('/meetings');
     };
 
-    // ESC ilə bağlama + arxa fonun scroll-unu dayandırma
     useEffect(() => {
         const onKey = (e) => {
             if (e.key === 'Escape') onClose();
@@ -549,7 +548,7 @@ export default function CalendarApp() {
                         </div>
                         <div>
                             <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Calendar</h1>
-                            <p className="text-xs md:text-sm text-gray-500 mt-0.5">Telegram bot və backend ilə sinxronlaşdırılıb</p>
+                            <p className="text-xs md:text-sm text-gray-500 mt-0.5">Synchronized with the Telegram bot and backend.</p>
                         </div>
                     </div>
                 </div>
@@ -619,7 +618,7 @@ export default function CalendarApp() {
                 </div>
             </div>
 
-            {/* Event Details Modal — body-yə portal olunur, sidebar daxil bütün ekranı örtür */}
+            {/* Event Details Modal*/}
             {selectedEvent && (
                 <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
             )}
