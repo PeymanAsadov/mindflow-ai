@@ -54,8 +54,6 @@ export default function Sidebar() {
     const handleSaveClick = async () => {
         if (updateUser) {
             await updateUser({ firstName: editFirstName, lastName: editLastName, gmail: editEmail });
-            // Additionally update the fallback local email if it's the primary tracker,
-            // though UserContext handles full persistence already.
             if (editEmail) {
                 localStorage.setItem('mindflow_user_email', editEmail);
             }
@@ -69,9 +67,9 @@ export default function Sidebar() {
             <div className="md:hidden flex items-center justify-between bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-50 w-full">
                 <div
                     onClick={() => navigate('/dashboard')}
-                    className="w-20 h-1 cursor-pointer flex items-center overflow-hidden"
+                    className="w-32 h-10 cursor-pointer flex items-center overflow-hidden"
                 >
-                    <img src={MindFlowLogo} alt="MindFlow AI" className="w-full h-full object-cover" />
+                    <img src={MindFlowLogo} alt="MindFlow AI" className="w-full h-full object-contain" />
                 </div>
                 <button
                     onClick={() => setMobileOpen(!mobileOpen)}
@@ -96,13 +94,16 @@ export default function Sidebar() {
                     }`}
             >
                 <div>
-                    {/* Logo hissəsi (Kompüter üçün) */}
+                    {/* Logo hissəsi (Həm mobil drawer, həm də kompüter sidebar üçün yuxarıda görünür) */}
                     <div
-                        onClick={() => navigate('/dashboard')}
-                        className="hidden md:flex items-center gap-3 mb-10 cursor-pointer group"
+                        onClick={() => {
+                            navigate('/dashboard');
+                            setMobileOpen(false);
+                        }}
+                        className="flex items-center gap-3 mb-8 cursor-pointer group"
                     >
-                        <div className="w-45 h-12  rounded-xl flex items-center justify-center flex-shrink-0 transition group-hover:scale-105 overflow-hidden">
-                            <img src={MindFlowLogo} alt="MindFlow AI" className="w-full h-full object-cover" />
+                        <div className="w-36 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition group-hover:scale-105 overflow-hidden">
+                            <img src={MindFlowLogo} alt="MindFlow AI" className="w-full h-full object-contain" />
                         </div>
                     </div>
 
@@ -114,7 +115,9 @@ export default function Sidebar() {
                                 location.pathname.startsWith('/notes') ||
                                 location.pathname.startsWith('/projects') ||
                                 location.pathname.startsWith('/meetings') ||
-                                location.pathname.startsWith('/todo')
+                                location.pathname.startsWith('/todo') ||
+                                location.pathname.startsWith('/healthcare') ||
+                                location.pathname.startsWith('/others')
                             );
 
                             const isActive = isDashboardActive || location.pathname === item.path;
@@ -147,24 +150,24 @@ export default function Sidebar() {
                         <div className="overflow-hidden flex-1">
                             {isEditingProfile ? (
                                 <div className="flex flex-col gap-1">
-                                    <input 
-                                        type="text" 
-                                        value={editFirstName} 
-                                        onChange={(e) => setEditFirstName(e.target.value)} 
+                                    <input
+                                        type="text"
+                                        value={editFirstName}
+                                        onChange={(e) => setEditFirstName(e.target.value)}
                                         className="text-sm font-bold text-gray-900 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
                                         placeholder="First Name"
                                     />
-                                    <input 
-                                        type="text" 
-                                        value={editLastName} 
-                                        onChange={(e) => setEditLastName(e.target.value)} 
+                                    <input
+                                        type="text"
+                                        value={editLastName}
+                                        onChange={(e) => setEditLastName(e.target.value)}
                                         className="text-xs text-gray-700 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
                                         placeholder="Last Name"
                                     />
-                                    <input 
-                                        type="email" 
-                                        value={editEmail} 
-                                        onChange={(e) => setEditEmail(e.target.value)} 
+                                    <input
+                                        type="email"
+                                        value={editEmail}
+                                        onChange={(e) => setEditEmail(e.target.value)}
                                         className="text-xs text-gray-500 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
                                         placeholder="Email Address"
                                     />
@@ -178,7 +181,10 @@ export default function Sidebar() {
                         </div>
                         <button
                             onClick={isEditingProfile ? handleSaveClick : handleEditClick}
-                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isEditingProfile ? 'text-[#00C875] bg-[#EBFBF0]' : 'text-gray-400 hover:text-[#00C875] hover:bg-gray-50'}`}
+                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isEditingProfile
+                                ? 'text-[#00C875] bg-[#EBFBF0]'
+                                : 'text-gray-400 hover:text-[#00C875] hover:bg-gray-50'
+                                }`}
                             title={isEditingProfile ? "Save Profile" : "Edit Profile"}
                         >
                             {isEditingProfile ? <Check size={16} /> : <Edit2 size={16} />}

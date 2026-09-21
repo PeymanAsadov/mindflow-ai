@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Calendar as CalendarIcon, ArrowLeft, Edit2, Check } from 'lucide-react';
@@ -68,6 +68,7 @@ const EVENT_STYLES = {
 
 const CATEGORY_COLOR = {
     todo: 'green',
+    tasks: 'green',
     projects: 'blue',
     meetings: 'purple',
     notes: 'amber',
@@ -100,9 +101,134 @@ function itemsToEvents(items) {
                 time: item.fields?.time || '09:00',
                 participants: item.fields?.participants || 'Peyman Asadov',
                 location: item.fields?.location || 'Google Meet',
-                link: item.fields?.link || '#'
+                link: item.fields?.link || '#',
+                source: 'backend'
             };
         });
+}
+
+// ---------- Local (not-yet-synced) items → Calendar events ----------
+// Notes/Projects/Meetings/ToDoList səhifələri lokal əlavələri öz localStorage
+// açarlarında saxlayır. Backend-ə sinxronlaşana qədər bu qeydlər `items` içində
+// olmur, ona görə Calendar onları görmürdü. Aşağıdakı funksiyalar hər açardan
+// yalnız backend-ə HƏLƏ sinxronlaşmamış (id-si "local-" ilə başlayan və
+// "items"-də olmayan) qeydləri götürüb, tarixi olanları calendar hadisəsinə çevirir.
+
+function readLocalList(storageKey) {
+    try {
+        const raw = localStorage.getItem(storageKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function getLocalOnly(storageKey, backendItems) {
+    const saved = readLocalList(storageKey);
+    const localOnly = saved.filter(i => String(i?.id).startsWith('local-'));
+    const existingIds = new Set((backendItems || []).map(i => i.id));
+    return localOnly.filter(i => !existingIds.has(i.id));
+}
+
+function localTasksToEvents(backendItems) {
+    const localOnly = getLocalOnly('mindflow_local_tasks', backendItems);
+    return localOnly
+        .filter(t => t?.date)
+        .map(t => {
+            const start = parseTime(t.time);
+            const safeStart = start !== null ? start : 9;
+            return {
+                id: t.id,
+                date: t.date,
+                start: safeStart,
+                end: safeStart + 1,
+                title: t.title || t.description || 'Task',
+                color: CATEGORY_COLOR.todo || 'green',
+                time: t.time || '09:00',
+                participants: 'Peyman Asadov',
+                location: 'Google Meet',
+                link: '#',
+                source: 'local-tasks'
+            };
+        });
+}
+
+function localProjectsToEvents(backendItems) {
+    const localOnly = getLocalOnly('mindflow_local_projects', backendItems);
+    return localOnly
+        .filter(p => p?.date)
+        .map(p => {
+            const start = parseTime(p.time);
+            const safeStart = start !== null ? start : 9;
+            return {
+                id: p.id,
+                date: p.date,
+                start: safeStart,
+                end: safeStart + 1,
+                title: p.title || p.description || 'Project',
+                color: CATEGORY_COLOR.projects || 'blue',
+                time: p.time || '09:00',
+                participants: p.relatedPeople || 'Peyman Asadov',
+                location: 'Google Meet',
+                link: '#',
+                source: 'local-projects'
+            };
+        });
+}
+
+function localMeetingsToEvents(backendItems) {
+    const localOnly = getLocalOnly('mindflow_local_meetings', backendItems);
+    return localOnly
+        .filter(m => m?.date)
+        .map(m => {
+            const start = parseTime(m.time);
+            const safeStart = start !== null ? start : 9;
+            const endParsed = parseTime(m.endTime);
+            return {
+                id: m.id,
+                date: m.date,
+                start: safeStart,
+                end: endParsed !== null ? endParsed : safeStart + 1,
+                title: m.title || m.description || 'Meeting',
+                color: CATEGORY_COLOR.meetings || 'purple',
+                time: m.time || '09:00',
+                participants: m.participants || 'Peyman Asadov',
+                location: m.location || 'Google Meet',
+                link: '#',
+                source: 'local-meetings'
+            };
+        });
+}
+
+// Backend items + üç səhifədən lokal-only qeydləri birləşdirib vahid hadisə siyahısı qurur
+function buildAllEvents(items) {
+    const safeItems = Array.isArray(items) ? items : [];
+    return [
+        ...itemsToEvents(safeItems),
+        ...localTasksToEvents(safeItems),
+        ...localProjectsToEvents(safeItems),
+        ...localMeetingsToEvents(safeItems),
+    ];
+}
+
+// Lokal-only qeydin hansı localStorage açarında olduğunu tapıb daxilində update edir
+// (backend-ə hələ sinxronlaşmamış hadisələr Calendar-dan redaktə olunanda istifadə olunur)
+function updateLocalItemById(id, patch) {
+    const storageKeys = ['mindflow_local_tasks', 'mindflow_local_projects', 'mindflow_local_meetings'];
+    for (const key of storageKeys) {
+        const list = readLocalList(key);
+        const idx = list.findIndex(i => i?.id === id);
+        if (idx !== -1) {
+            const updated = [...list];
+            updated[idx] = { ...updated[idx], ...patch };
+            try {
+                localStorage.setItem(key, JSON.stringify(updated));
+            } catch (e) { /* ignore */ }
+            return true;
+        }
+    }
+    return false;
 }
 
 function formatHour(h) {
@@ -122,6 +248,79 @@ function formatRange(start, end) {
 function nowFraction() {
     const now = new Date();
     return now.getHours() + now.getMinutes() / 60;
+}
+
+
+// ---------- Ağıllı Kəsişmə və Qruplaşdırma Alqoritmi (Variant A) ----------
+
+function getEventLayout(dayEvents) {
+    if (!dayEvents || dayEvents.length === 0) return [];
+
+    // Tədbirləri başlanğıc vaxtına görə sıralayırıq
+    const sorted = [...dayEvents].sort((a, b) => {
+        if (a.start !== b.start) return a.start - b.start;
+        return (b.end - b.start) - (a.end - a.start);
+    });
+
+    // Hadisələri klasterlərə (qruplara) bölürük ki, kəsişməyənlər bir-birinə təsir etməsin
+    const clusters = [];
+    let currentCluster = [];
+    let clusterMaxEnd = 0;
+
+    sorted.forEach((event) => {
+        if (currentCluster.length === 0) {
+            currentCluster.push(event);
+            clusterMaxEnd = event.end;
+        } else {
+            // Əgər bu tədbir cari qrupun hər hansı bir yeri ilə kəsişirsə
+            if (event.start < clusterMaxEnd) {
+                currentCluster.push(event);
+                clusterMaxEnd = Math.max(clusterMaxEnd, event.end);
+            } else {
+                clusters.push(currentCluster);
+                currentCluster = [event];
+                clusterMaxEnd = event.end;
+            }
+        }
+    });
+    if (currentCluster.length > 0) {
+        clusters.push(currentCluster);
+    }
+
+    const processedEvents = [];
+
+    clusters.forEach((cluster) => {
+        // Hər qrup daxilində sütunlara bölmə
+        const columns = [];
+
+        cluster.forEach((event) => {
+            let placed = false;
+            for (let i = 0; i < columns.length; i++) {
+                const col = columns[i];
+                const lastEvent = col[col.length - 1];
+                // Əgər bu sütundakı sonuncu tədbir artıq bitibsə, bu sütuna əlavə edə bilərik
+                if (lastEvent.end <= event.start) {
+                    col.push(event);
+                    event._col = i;
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                event._col = columns.length;
+                columns.push([event]);
+            }
+        });
+
+        // Hər qrupun öz daxilindəki maksimum sütun sayı
+        const totalCols = Math.max(columns.length, 1);
+        cluster.forEach((event) => {
+            event._totalCols = totalCols;
+            processedEvents.push(event);
+        });
+    });
+
+    return processedEvents;
 }
 
 // ---------- Week grid ----------
@@ -171,8 +370,7 @@ function WeekGrid({ weekStart, events, onSelectEvent }) {
                                 {d.label}
                             </span>
                             <span
-                                className={`mt-1 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs md:text-sm font-bold ${isToday ? 'bg-[#00C875] text-white' : 'text-gray-700'
-                                    }`}
+                                className={`mt-1 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs md:text-sm font-bold ${isToday ? 'bg-[#00C875] text-white' : 'text-gray-700'}`}
                             >
                                 {d.date}
                             </span>
@@ -210,37 +408,56 @@ function WeekGrid({ weekStart, events, onSelectEvent }) {
                             ))}
                         </div>
 
-                        {days.map((d) => (
-                            <div key={d.key} className="flex-1 min-w-0 relative border-l border-gray-100">
-                                {safeEvents.filter((e) => e.date === d.key).map((e, idx) => {
-                                    const style = EVENT_STYLES[e.color] || EVENT_STYLES.purple;
-                                    const top = (e.start - START_HOUR) * hourHeight;
-                                    const height = Math.max((e.end - e.start) * hourHeight, isMobile ? 18 : 24);
-                                    return (
-                                        <div
-                                            key={idx}
-                                            onClick={() => onSelectEvent(e)}
-                                            className="absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded-md sm:rounded-lg px-1 py-0.5 sm:px-2 sm:py-1 md:px-2.5 md:py-1.5 overflow-hidden shadow-sm transition-all hover:z-10 hover:shadow-md cursor-pointer"
-                                            style={{ top, height, backgroundColor: style.bg, color: style.text }}
-                                        >
-                                            <p className="text-[8px] sm:text-[10px] md:text-[11px] font-semibold leading-tight truncate">{e.title}</p>
-                                            {height > 30 && (
-                                                <p className="text-[7px] sm:text-[9px] md:text-[10px] opacity-80 leading-tight mt-0.5 truncate">
-                                                    {formatRange(e.start, e.end)}
-                                                </p>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                        {days.map((d) => {
+                            const dayRawEvents = safeEvents.filter((e) => e.date === d.key);
+                            const dayEvents = getEventLayout(dayRawEvents);
 
-                                {d.key === TODAY_KEY && showNowLine && (
-                                    <div className="absolute left-0 right-0 flex items-center pointer-events-none z-10" style={{ top: nowTop }}>
-                                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 -ml-[3px] sm:-ml-[4px]" />
-                                        <div className="flex-1 h-0.5 bg-red-500" />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                            return (
+                                <div key={d.key} className="flex-1 min-w-0 relative border-l border-gray-100">
+                                    {dayEvents.map((e, idx) => {
+                                        const style = EVENT_STYLES[e.color] || EVENT_STYLES.purple;
+                                        const top = (e.start - START_HOUR) * hourHeight;
+                                        const height = Math.max((e.end - e.start) * hourHeight, isMobile ? 18 : 24);
+
+                                        const totalCols = e._totalCols || 1;
+                                        const colIndex = e._col || 0;
+                                        // Bir-birinə keçid üçün kiçik offset veririk ki, sərhədlər yapışmasın
+                                        const widthPercent = 100 / totalCols;
+                                        const leftPercent = colIndex * widthPercent;
+
+                                        return (
+                                            <div
+                                                key={e.id ?? idx}
+                                                onClick={() => onSelectEvent(e)}
+                                                className="absolute rounded-md sm:rounded-lg px-1 py-0.5 sm:px-2 sm:py-1 md:px-2.5 md:py-1.5 overflow-hidden shadow-sm transition-all hover:z-30 hover:shadow-md cursor-pointer"
+                                                style={{
+                                                    top,
+                                                    height,
+                                                    backgroundColor: style.bg,
+                                                    color: style.text,
+                                                    left: `calc(${leftPercent}% + 1px)`,
+                                                    width: `calc(${widthPercent}% - 2px)`,
+                                                }}
+                                            >
+                                                <p className="text-[8px] sm:text-[10px] md:text-[11px] font-semibold leading-tight truncate">{e.title}</p>
+                                                {height > 30 && (
+                                                    <p className="text-[7px] sm:text-[9px] md:text-[10px] opacity-80 leading-tight mt-0.5 truncate">
+                                                        {formatRange(e.start, e.end)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+
+                                    {d.key === TODAY_KEY && showNowLine && (
+                                        <div className="absolute left-0 right-0 flex items-center pointer-events-none z-10" style={{ top: nowTop }}>
+                                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 -ml-[3px] sm:-ml-[4px]" />
+                                            <div className="flex-1 h-0.5 bg-red-500" />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
@@ -305,7 +522,7 @@ function MonthGrid({ monthDate, events, onSelectEvent }) {
                             <div className="space-y-0.5 md:space-y-1">
                                 {visible.map((e, idx) => (
                                     <div
-                                        key={idx}
+                                        key={e.id ?? idx}
                                         onClick={() => onSelectEvent(e)}
                                         className="flex items-center gap-1 text-[10px] md:text-[11px] text-gray-600 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition"
                                     >
@@ -336,11 +553,11 @@ function MonthGrid({ monthDate, events, onSelectEvent }) {
 
 // ---------- Event modal (portal) ----------
 
-function EventModal({ event, onClose }) {
+function EventModal({ event, onClose, onLocalSave }) {
     const navigate = useNavigate();
     const { updateItem, items } = useUser();
     const [isEditing, setIsEditing] = useState(false);
-    
+
     const [editTitle, setEditTitle] = useState(event?.title || '');
     const [editDate, setEditDate] = useState(event?.date || '');
     const [editTime, setEditTime] = useState(event?.time || '');
@@ -349,8 +566,10 @@ function EventModal({ event, onClose }) {
 
     const handleSave = async () => {
         if (!event?.id) return;
+
         const rawItem = (items || []).find(i => i.id === event.id);
-        if (updateItem && rawItem) {
+        if (rawItem && updateItem) {
+            // Backend-ə sinxronlaşmış hadisə — normal update
             await updateItem(event.id, {
                 ...rawItem,
                 fields: {
@@ -362,6 +581,17 @@ function EventModal({ event, onClose }) {
                     location: editLocation
                 }
             });
+        } else {
+            // Hələ backend-ə sinxronlaşmamış (lokal) hadisə — müvafiq localStorage
+            // siyahısında (tasks/projects/meetings) tapıb birbaşa yeniləyirik
+            updateLocalItemById(event.id, {
+                title: editTitle,
+                date: editDate,
+                time: editTime,
+                participants: editParticipants,
+                location: editLocation
+            });
+            if (onLocalSave) onLocalSave();
         }
         setIsEditing(false);
     };
@@ -422,8 +652,8 @@ function EventModal({ event, onClose }) {
                         📅
                     </div>
                     {isEditing ? (
-                        <input 
-                            value={editTitle} 
+                        <input
+                            value={editTitle}
                             onChange={e => setEditTitle(e.target.value)}
                             className="text-xl font-bold text-gray-800 leading-snug w-full border border-gray-200 rounded px-1.5 focus:outline-none focus:border-purple-600 cursor-text"
                         />
@@ -499,7 +729,28 @@ export default function CalendarApp() {
     const [selectedEvent, setSelectedEvent] = useState(null);
 
     const { items } = useUser();
-    const events = useMemo(() => itemsToEvents(items), [items]);
+
+    // localStorage-dəki lokal (hələ sinxronlaşmamış) qeydlərin dəyişdiyini izləmək
+    // üçün "versiya" sayğacı — hər dəfə artdıqda events yenidən hesablanır.
+    const [localVersion, setLocalVersion] = useState(0);
+    const bumpLocalVersion = useCallback(() => setLocalVersion(v => v + 1), []);
+
+    useEffect(() => {
+        // Başqa tab-da və ya bu tab-da (Notes/Projects/Meetings/ToDoList səhifəsində
+        // yeni qeyd əlavə olunanda) localStorage dəyişərsə calendar-ı yeniləyək
+        window.addEventListener('storage', bumpLocalVersion);
+        window.addEventListener('focus', bumpLocalVersion);
+        return () => {
+            window.removeEventListener('storage', bumpLocalVersion);
+            window.removeEventListener('focus', bumpLocalVersion);
+        };
+    }, [bumpLocalVersion]);
+
+    const events = useMemo(
+        () => buildAllEvents(items),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [items, localVersion]
+    );
 
     const weekStart = useMemo(() => startOfWeek(cursorDate), [cursorDate]);
 
@@ -620,7 +871,11 @@ export default function CalendarApp() {
 
             {/* Event Details Modal*/}
             {selectedEvent && (
-                <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+                <EventModal
+                    event={selectedEvent}
+                    onClose={() => setSelectedEvent(null)}
+                    onLocalSave={bumpLocalVersion}
+                />
             )}
         </div>
     );
