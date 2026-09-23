@@ -11,7 +11,6 @@ import HealthCare from './components/HealthCare'; // Sağlıq komponentini daxil
 import LoadingScreen from './Loadingscreen';
 import LoginPage from './components/Login';
 import Logout from './components/Logout';
-import Others from './components/Others'; // Yeni komponenti import edirik
 import { UserProvider } from './UserContext';
 
 export default function App() {
@@ -58,7 +57,6 @@ export default function App() {
             <Route path="/meetings" element={<Meetings />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/healthcare" element={<HealthCare />} />
-            <Route path="/others" element={<Others />} /> {/* Others səhifəsinin route-u */}
           </Route>
         </Routes>
       </UserProvider>

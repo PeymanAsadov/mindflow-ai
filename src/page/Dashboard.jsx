@@ -8,15 +8,12 @@ import {
     Users,
     FileText,
     HeartPulse,
-    Inbox,
     Sparkles,
     Loader2,
     Paperclip,
     ArrowUp,
     Edit2,
-    Check,
-    Calendar,
-    Clock
+    Check
 } from 'lucide-react';
 
 function formatToday() {
@@ -59,10 +56,6 @@ function buildSummary(items) {
     };
 }
 
-// Hər səhifənin (Notes, Projects, Meetings, ToDoList, HealthCare) özündə saxladığı
-// localStorage siyahısı ilə backend-dən gələn "items"-i birləşdirib DÜZGÜN sayı hesablayır.
-// Bu, hər hansı bir səhifədə lokal əlavə olunan (hələ backend-ə sinxronlaşmamış) qeydlərin
-// də "Your Memory" say göstəricilərinə daxil olmasını təmin edir.
 function getMergedCount(rawItems, storageKey) {
     let saved = [];
     try {
@@ -80,10 +73,6 @@ function getMergedCount(rawItems, storageKey) {
     return rawItems.length + uniqueLocalOnly.length;
 }
 
-// Projects səhifəsi başlıqda yalnız status = "Active" olan layihələrin sayını göstərir
-// (activeProjects.length). Dashboard-un "Your Memory" kartı da EYNİ məntiqlə saysın deyə
-// bu xüsusi funksiyanı istifadə edirik — əks halda arxivlənmiş/tamamlanmış layihələr də
-// sayıla bilər və iki səhifədəki rəqəmlər fərqli görünər.
 function getMergedActiveProjectsCount(rawItems, storageKey) {
     let saved = [];
     try {
@@ -131,7 +120,6 @@ export default function Dashboard() {
     const [askAnswer, setAskAnswer] = useState(null);
     const [askError, setAskError] = useState(null);
 
-    // "Your Memory" say göstəriciləri — hər dəfə Dashboard-a qayıdanda yenilənsin deyə state-də saxlanılır
     const [memoryCounts, setMemoryCounts] = useState({
         tasks: 0,
         projects: 0,
@@ -152,13 +140,8 @@ export default function Dashboard() {
     const meetings = safeItems.filter(i => i.category === 'meetings');
     const notes = safeItems.filter(i => i.category === 'notes');
     const health = safeItems.filter(i => i.category === 'health' || i.category === 'health & care');
-    const others = safeItems.filter(i => !i.category || i.category === 'others' || i.category === 'unreviewed');
-
-    // ToDoList səhifəsi qeydləri 'tasks' kateqoriyası ilə saxlayır (Dashboard-dakı 'todo'-dan fərqli),
-    // ona görə say hesablamaq üçün ayrıca filter aparırıq.
     const tasksRaw = safeItems.filter(i => i.category === 'tasks');
 
-    // localStorage-dəki lokal əlavələrlə (Notes, Projects, Meetings, ToDoList, HealthCare) birləşdirilmiş dəqiq saylar
     useEffect(() => {
         const recalc = () => {
             setMemoryCounts({
@@ -172,9 +155,7 @@ export default function Dashboard() {
 
         recalc();
 
-        // Başqa tab/pəncərədə localStorage dəyişərsə də sayları yeniləyək
         window.addEventListener('storage', recalc);
-        // İstifadəçi başqa səhifəyə keçib geri qayıdanda (tab fokuslananda) də yeniləyək
         window.addEventListener('focus', recalc);
 
         return () => {
@@ -187,10 +168,8 @@ export default function Dashboard() {
     const firstName = user?.firstName || 'Peyman';
     const summary = buildSummary(safeItems);
 
-    // Dynamic calculations
     const todayStr = new Date().toISOString().split('T')[0];
     const urgentTodosCount = todos.filter(i => i.fields?.date === todayStr || i.fields?.isUrgent).length;
-    const notesThisWeekCount = notes.length;
 
     const handleAskSubmit = async (queryText) => {
         const textToAsk = queryText || question;
@@ -324,89 +303,22 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Today's Focus and Today's Schedule Sections */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-                {/* Today's Focus */}
-                <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col justify-between">
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-gray-900 text-base md:text-lg">Today's Focus</h3>
-                            <span className="text-xs text-gray-400">Prioritized by AI</span>
-                        </div>
-                        <div className="space-y-3">
-                            {todos.length > 0 ? (
-                                todos.slice(0, 3).map((todo, idx) => (
-                                    <div key={todo.id || idx} className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50/70 border border-gray-100">
-                                        <div className="w-5 h-5 rounded-full border-2 border-emerald-500 flex items-center justify-center text-emerald-600 flex-shrink-0">
-                                            {idx === 0 && <Check size={12} className="stroke-[3]" />}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs sm:text-sm font-medium text-gray-800 truncate">
-                                                {todo.fields?.title || todo.fields?.description || 'Task'}
-                                            </p>
-                                            <p className="text-[11px] text-gray-400">Task {todo.fields?.date ? `• Due: ${todo.fields.date}` : ''}</p>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-xs text-gray-400 py-4 text-center">No active tasks.</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Today's Schedule */}
-                <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col justify-between">
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-gray-900 text-base md:text-lg">Today's Schedule</h3>
-                            <span className="text-xs text-gray-400">{meetings.length} events in your calendar</span>
-                        </div>
-                        <div className="space-y-3">
-                            {meetings.length > 0 ? (
-                                meetings.slice(0, 3).map((meeting, idx) => (
-                                    <div key={meeting.id || idx} className="flex items-start gap-3 p-3 rounded-2xl bg-gray-50/70 border border-gray-100">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 mt-2 flex-shrink-0"></div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-semibold text-gray-700">{meeting.fields?.time || '10:00'}</span>
-                                            </div>
-                                            <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                                                {meeting.fields?.title || meeting.fields?.description || 'Meeting'}
-                                            </p>
-                                            <p className="text-[11px] text-gray-400">Meeting</p>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-xs text-gray-400 py-4 text-center">No scheduled meetings for today.</p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="mt-4 pt-2">
-                        <button onClick={() => navigate('/meetings')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
-                            View Meetings →
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Memory Categories (Grid) */}
+            {/* Memory Categories (Asymmetric Grid şəkildəki dizayna uyğun) */}
             <div className="mb-10">
                 <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-1">Your Memory</h3>
                 <p className="text-[11px] sm:text-xs text-gray-400 mb-4 sm:mb-6">Everything MindFlow has organized for you.</p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                    {/* Tasks */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                    {/* To Do List (Geniş - 5 sütun) */}
                     <div
                         onClick={() => navigate('/todo')}
-                        className="bg-[#EBFBF0] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-40 md:h-48"
+                        className="md:col-span-5 bg-[#EBFBF0] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
                     >
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-emerald-600 flex items-center justify-center shadow-sm">
                             <CheckSquare size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Tasks</h4>
+                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">To Do List</h4>
                             <p className="text-xs text-gray-500">{memoryCounts.tasks} active tasks</p>
                             {urgentTodosCount > 0 && (
                                 <p className="text-[11px] text-rose-500 mt-0.5">{urgentTodosCount} due today</p>
@@ -414,10 +326,10 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    {/* Projects */}
+                    {/* Projects (Orta - 4 sütun) */}
                     <div
                         onClick={() => navigate('/projects')}
-                        className="bg-[#EDF4FF] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-40 md:h-48"
+                        className="md:col-span-4 bg-[#EDF4FF] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
                     >
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-blue-600 flex items-center justify-center shadow-sm">
                             <FolderKanban size={20} />
@@ -428,39 +340,10 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    {/* Meetings */}
-                    <div
-                        onClick={() => navigate('/meetings')}
-                        className="bg-[#F3EFFE] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-40 md:h-48"
-                    >
-                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-purple-600 flex items-center justify-center shadow-sm">
-                            <Users size={20} />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Meetings</h4>
-                            <p className="text-xs text-gray-500">{memoryCounts.meetings} upcoming meetings</p>
-                        </div>
-                    </div>
-
-                    {/* Notes */}
-                    <div
-                        onClick={() => navigate('/notes')}
-                        className="bg-[#FFFAEC] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-40 md:h-48"
-                    >
-                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-amber-500 flex items-center justify-center shadow-sm">
-                            <FileText size={20} />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Notes</h4>
-                            <p className="text-xs text-gray-500">{memoryCounts.notes} notes</p>
-                            <p className="text-[11px] text-gray-400 mt-0.5">Notes added this week</p>
-                        </div>
-                    </div>
-
-                    {/* Health & Care */}
+                    {/* Health & Care (Dar - 3 sütun) */}
                     <div
                         onClick={() => navigate('/healthcare')}
-                        className="bg-[#FFF1F2] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-40 md:h-48"
+                        className="md:col-span-3 bg-[#FFF1F2] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
                     >
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-rose-500 flex items-center justify-center shadow-sm">
                             <HeartPulse size={20} />
@@ -471,17 +354,31 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    {/* Others */}
+                    {/* Meetings (Geniş - 6 sütun, aşağı sətir) */}
                     <div
-                        onClick={() => navigate('/others')}
-                        className="bg-[#E6F4EA] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-40 md:h-48"
+                        onClick={() => navigate('/meetings')}
+                        className="md:col-span-6 bg-[#F3EFFE] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
                     >
-                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-emerald-600 flex items-center justify-center shadow-sm">
-                            <Inbox size={20} />
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-purple-600 flex items-center justify-center shadow-sm">
+                            <Users size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Others</h4>
-                            <p className="text-xs text-gray-500">{others.length} items to review</p>
+                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Meetings</h4>
+                            <p className="text-xs text-gray-500">{memoryCounts.meetings} upcoming</p>
+                        </div>
+                    </div>
+
+                    {/* Notes (Geniş - 6 sütun, aşağı sətir) */}
+                    <div
+                        onClick={() => navigate('/notes')}
+                        className="md:col-span-6 bg-[#FFFAEC] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
+                    >
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-amber-500 flex items-center justify-center shadow-sm">
+                            <FileText size={20} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Notes</h4>
+                            <p className="text-xs text-gray-500">{memoryCounts.notes} notes</p>
                         </div>
                     </div>
                 </div>
