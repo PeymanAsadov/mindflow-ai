@@ -17,7 +17,7 @@ export default function Notes() {
     const [newTitle, setNewTitle] = useState('');
     const [newContent, setNewContent] = useState('');
 
-    // Local state (həm lokal əlavə olunanlar, həm də bot/backend sinxronizasiyası üçün)
+    // Local state
     const [localNotes, setLocalNotes] = useState(() => {
         const saved = localStorage.getItem('mindflow_local_notes');
         return saved ? JSON.parse(saved) : [];
@@ -29,8 +29,7 @@ export default function Notes() {
             id: item.id,
             title: item.fields?.title || 'Note',
             content: item.fields?.description || '',
-            date: item.fields?.date || new Date().toLocaleDateString(),
-            completed: item.fields?.completed || false
+            date: item.fields?.date || new Date().toLocaleDateString()
         }));
 
         setLocalNotes(prev => {
@@ -82,29 +81,6 @@ export default function Notes() {
         setEditingId(null);
     };
 
-    const handleToggleComplete = async (id, e) => {
-        e.stopPropagation();
-        setLocalNotes(prev => {
-            const updated = prev.map(note =>
-                note.id === id ? { ...note, completed: !note.completed } : note
-            );
-            localStorage.setItem('mindflow_local_notes', JSON.stringify(updated));
-            return updated;
-        });
-
-        const rawNotes = Array.isArray(items) ? items.filter(i => i.category === 'notes') : [];
-        const rawNote = rawNotes.find(i => i.id === id);
-        if (updateItem && rawNote) {
-            await updateItem(id, {
-                ...rawNote,
-                fields: {
-                    ...rawNote.fields,
-                    completed: !rawNote.fields?.completed
-                }
-            });
-        }
-    };
-
     const handleCreateNote = async (e) => {
         e.preventDefault();
         if (!newTitle.trim()) return;
@@ -113,8 +89,7 @@ export default function Notes() {
             id: 'local-' + Date.now(),
             title: newTitle,
             content: newContent,
-            date: new Date().toLocaleDateString(),
-            completed: false
+            date: new Date().toLocaleDateString()
         };
 
         setLocalNotes(prev => {
@@ -129,8 +104,7 @@ export default function Notes() {
                 fields: {
                     title: newTitle,
                     description: newContent,
-                    date: new Date().toLocaleDateString(),
-                    completed: false
+                    date: new Date().toLocaleDateString()
                 }
             });
         }
@@ -154,7 +128,6 @@ export default function Notes() {
         title: item.title || 'Note',
         content: item.content || '',
         date: item.date || '',
-        completed: item.completed || false,
         highlighted: idx === 0,
     }));
 
@@ -244,7 +217,6 @@ export default function Notes() {
                                         setEditContent={setEditContent}
                                         onEdit={handleEdit}
                                         onSave={handleSave}
-                                        onToggleComplete={handleToggleComplete}
                                         onDelete={handleDeleteNote}
                                     />
                                 ))
@@ -344,7 +316,7 @@ export default function Notes() {
     );
 }
 
-function NoteItem({ note, nIndex, isLast, editingId, editTitle, editContent, setEditTitle, setEditContent, onEdit, onSave, onToggleComplete, onDelete }) {
+function NoteItem({ note, nIndex, isLast, editingId, editTitle, editContent, setEditTitle, setEditContent, onEdit, onSave, onDelete }) {
     const isEditing = editingId === note.id;
 
     const [offsetX, setOffsetX] = useState(0);
@@ -370,7 +342,6 @@ function NoteItem({ note, nIndex, isLast, editingId, editTitle, editContent, set
     const handleTouchEnd = () => {
         if (!isSwiping) return;
         setIsSwiping(false);
-        // Əgər 40px-dən çox sola çəkilibsə səbət qutusunu açıq saxla, əks halda axıcı şəkildə geri bağla
         if (offsetX < -40) {
             setOffsetX(-80);
         } else {
@@ -380,9 +351,9 @@ function NoteItem({ note, nIndex, isLast, editingId, editTitle, editContent, set
 
     return (
         <div className={`relative overflow-hidden ${!isLast ? 'border-b border-gray-100' : ''}`}>
-            {/* Arxa fondakı qırmızı səbət qutusu düyməsi */}
+            {/* Arxa fondakı qırmızı səbət qutusu düyməsi (Yalnız mobil cihazlarda sürüşdürərkən görünür) */}
             <div
-                className="absolute inset-y-0 right-0 w-20 bg-red-500 flex items-center justify-center text-white cursor-pointer z-0 transition-opacity"
+                className="absolute inset-y-0 right-0 w-20 bg-red-500 md:hidden flex items-center justify-center text-white cursor-pointer z-0"
                 onClick={() => onDelete(note.id)}
             >
                 <Trash2 size={18} />
@@ -397,21 +368,9 @@ function NoteItem({ note, nIndex, isLast, editingId, editTitle, editContent, set
                     transform: `translateX(${offsetX}px)`,
                     transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(.16,1,.3,1)'
                 }}
-                className={`p-4 sm:p-5 bg-white select-none relative z-10 ${note.completed ? 'bg-gray-50/80' : (note.highlighted && nIndex === 0 ? 'bg-[#FFFAEC]/40 hover:bg-[#FFFAEC]/60' : 'hover:bg-gray-50/50')
-                    }`}
+                className={`p-4 sm:p-5 bg-white select-none relative z-10 ${note.highlighted && nIndex === 0 ? 'bg-[#FFFAEC]/40 hover:bg-[#FFFAEC]/60' : 'hover:bg-gray-50/50'}`}
             >
                 <div className="flex items-start gap-3">
-                    <button
-                        onClick={(e) => onToggleComplete(note.id, e)}
-                        className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border transition flex items-center justify-center ${note.completed
-                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
-                                : 'border-gray-300 hover:border-amber-500 bg-transparent'
-                            }`}
-                        title={note.completed ? "Mark as active" : "Mark as completed"}
-                    >
-                        {note.completed && <Check size={12} strokeWidth={3} />}
-                    </button>
-
                     <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-1">
                             <div className="w-full pr-16 sm:pr-24">
@@ -422,8 +381,7 @@ function NoteItem({ note, nIndex, isLast, editingId, editTitle, editContent, set
                                         className="font-bold text-sm sm:text-base w-full border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-amber-500"
                                     />
                                 ) : (
-                                    <h3 className={`font-bold text-sm sm:text-base transition-colors ${note.completed ? 'line-through text-gray-400' : (note.highlighted && nIndex === 0 ? 'text-amber-800' : 'text-gray-900')
-                                        }`}>
+                                    <h3 className={`font-bold text-sm sm:text-base transition-colors ${note.highlighted && nIndex === 0 ? 'text-amber-800' : 'text-gray-900'}`}>
                                         {note.title}
                                     </h3>
                                 )}
@@ -468,8 +426,7 @@ function NoteItem({ note, nIndex, isLast, editingId, editTitle, editContent, set
                             />
                         ) : (
                             note.content ? (
-                                <p className={`text-xs sm:text-sm leading-relaxed transition-colors ${note.completed ? 'line-through text-gray-400' : 'text-gray-500'
-                                    }`}>
+                                <p className="text-xs sm:text-sm leading-relaxed text-gray-500">
                                     {note.content}
                                 </p>
                             ) : null
