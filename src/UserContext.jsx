@@ -1,5 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getUser, getAllItems, updateUser, updateItem } from './services/api';
+import React, {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    useCallback,
+    useRef,
+} from 'react';
+
+import {
+    getUser,
+    getAllItems,
+    updateUser as apiUpdateUser,
+    addItem as apiAddItem,
+    updateItem as apiUpdateItem,
+    deleteItem as apiDeleteItem,
+} from './services/api';
 
 const UserContext = createContext(null);
 
@@ -9,97 +24,292 @@ export function UserProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const mountedRef = useRef(true);
+    const requestIdRef = useRef(0);
+
     const fetchAll = useCallback(async (isBackground = false) => {
-        if (!isBackground) setLoading(true);
-        if (!isBackground) setError(null);
-        try {
-            const email = localStorage.getItem('mindflow_user_email') || '';
-            if (!email) {
-                if (!isBackground) setLoading(false);
-                return;
+        const requestId = ++requestIdRef.current;
+
+        if (!isBackground && mountedRef.current) {
+            setLoading(true);
+            setError(null);
+        }
+
+        const email = localStorage.getItem('mindflow_user_email') || '';
+
+        if (!email) {
+            if (mountedRef.current) {
+                setUser(null);
+                setItems([]);
+                setLoading(false);
             }
-            let [userData, itemsData] = await Promise.all([
+            return false;
+        }
+
+        try {
+            const [userData, itemsData] = await Promise.all([
                 getUser(email),
                 getAllItems(email),
             ]);
-            
-            try {
-                const localUserUpdates = JSON.parse(localStorage.getItem('mindflow_user_updates')) || {};
-                if (userData) {
-                    userData = { ...userData, ...localUserUpdates };
-                }
-                
-                const localItemUpdates = JSON.parse(localStorage.getItem('mindflow_item_updates')) || {};
-                let mergedItems = Array.isArray(itemsData) ? itemsData : [];
-                mergedItems = mergedItems.map(i => localItemUpdates[i.id] ? { ...i, ...localItemUpdates[i.id] } : i);
-                itemsData = mergedItems;
-            } catch (e) {
-                console.error('Error merging local state', e);
+
+            // Ignore outdated requests.
+            if (
+                !mountedRef.current ||
+                requestId !== requestIdRef.current
+            ) {
+                return false;
             }
 
-            setUser(userData);
-            setItems(Array.isArray(itemsData) ? itemsData : []);
+            let mergedUser = userData;
+            let mergedItems = Array.isArray(itemsData) ? itemsData : [];
+
+            try {
+                const userUpdates = JSON.parse(
+                    localStorage.getItem('mindflow_user_updates') || '{}'
+                );
+
+                if (mergedUser) {
+                    mergedUser = { ...mergedUser, ...userUpdates };
+                }
+
+                const itemUpdates = JSON.parse(
+                    localStorage.getItem('mindflow_item_updates') || '{}'
+                );
+
+                mergedItems = mergedItems.map(item => {
+                    const localUpdate = itemUpdates[item.id];
+
+                    return localUpdate
+                        ? { ...item, ...localUpdate }
+                        : item;
+                });
+            } catch (storageError) {
+                console.warn('Could not merge local updates:', storageError);
+            }
+
+            setUser(mergedUser);
+            setItems(mergedItems);
+            setError(null);
+
+            return true;
         } catch (err) {
-            console.error('UserContext fetch error:', err);
-            if (!isBackground) setError('Failed to load data from server.');
+            if (
+                mountedRef.current &&
+                requestId === requestIdRef.current
+            ) {
+                if (!isBackground) {
+                    setError('Failed to load data from server.');
+                }
+
+                console.warn(
+                    'Could not fetch MindFlow data:',
+                    err.response?.data || err.message
+                );
+            }
+
+            return false;
         } finally {
-            if (!isBackground) setLoading(false);
+            if (
+                mountedRef.current &&
+                requestId === requestIdRef.current &&
+                !isBackground
+            ) {
+                setLoading(false);
+            }
         }
     }, []);
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchAll();
+
+        // Refresh less frequently to avoid unnecessary requests.
         const interval = setInterval(() => {
             fetchAll(true);
-        }, 5000);
-        return () => clearInterval(interval);
+        }, 15000);
+
+        return () => {
+            mountedRef.current = false;
+            clearInterval(interval);
+            requestIdRef.current += 1;
+        };
     }, [fetchAll]);
 
     const handleUpdateUser = async (data) => {
         const email = localStorage.getItem('mindflow_user_email') || '';
-        
+
         setUser(prev => ({ ...prev, ...data }));
+
         try {
-            const local = JSON.parse(localStorage.getItem('mindflow_user_updates')) || {};
-            localStorage.setItem('mindflow_user_updates', JSON.stringify({ ...local, ...data }));
-        } catch (e) {
-            console.error('Error saving user update to local', e);
+            const local = JSON.parse(
+                localStorage.getItem('mindflow_user_updates') || '{}'
+            );
+
+            localStorage.setItem(
+                'mindflow_user_updates',
+                JSON.stringify({ ...local, ...data })
+            );
+        } catch (err) {
+            console.warn('Could not save local user update:', err);
         }
 
-        if (email) {
-            try {
-                await updateUser(email, data);
-            } catch (err) {
-                console.error('Failed to sync user to backend', err);
-            }
+        if (!email) return { ok: false, error: 'No user email configured' };
+
+        try {
+            const result = await apiUpdateUser(email, data);
             await fetchAll(true);
+            return { ok: true, result };
+        } catch (err) {
+            console.warn(
+                'Could not update user on server:',
+                err.response?.data || err.message
+            );
+
+            return {
+                ok: false,
+                error: err.response?.data?.error || err.message,
+            };
+        }
+    };
+
+    const handleAddItem = async (data) => {
+        const email = localStorage.getItem('mindflow_user_email') || '';
+
+        if (!email) {
+            return { ok: false, error: 'No user email configured' };
+        }
+
+        try {
+            const result = await apiAddItem(email, data);
+
+            // Refresh only after the server confirms creation.
+            await fetchAll(true);
+
+            return {
+                ok: true,
+                item: result?.item || result,
+                result,
+            };
+        } catch (err) {
+            console.warn(
+                'Could not add item on server:',
+                err.response?.data || err.message
+            );
+
+            return {
+                ok: false,
+                error:
+                    err.response?.data?.error ||
+                    err.message ||
+                    'Could not add item',
+                status: err.response?.status,
+                missing: err.response?.data?.missing,
+            };
         }
     };
 
     const handleUpdateItem = async (itemId, data) => {
         const email = localStorage.getItem('mindflow_user_email') || '';
-        
-        setItems(prev => prev.map(i => i.id === itemId ? { ...i, ...data } : i));
-        try {
-            const local = JSON.parse(localStorage.getItem('mindflow_item_updates')) || {};
-            local[itemId] = { ...(local[itemId] || {}), ...data };
-            localStorage.setItem('mindflow_item_updates', JSON.stringify(local));
-        } catch (e) {
-            console.error('Error saving item update to local', e);
+
+        if (!email) {
+            return { ok: false, error: 'No user email configured' };
         }
 
-        if (email) {
-            try {
-                await updateItem(email, itemId, data);
-            } catch (err) {
-                console.error('Failed to sync item to backend', err);
-            }
+        const previousItems = items;
+
+        setItems(prev =>
+            prev.map(item =>
+                String(item.id) === String(itemId)
+                    ? { ...item, ...data }
+                    : item
+            )
+        );
+
+        try {
+            const local = JSON.parse(
+                localStorage.getItem('mindflow_item_updates') || '{}'
+            );
+
+            local[itemId] = {
+                ...(local[itemId] || {}),
+                ...data,
+            };
+
+            localStorage.setItem(
+                'mindflow_item_updates',
+                JSON.stringify(local)
+            );
+        } catch (err) {
+            console.warn('Could not save local item update:', err);
+        }
+
+        try {
+            const result = await apiUpdateItem(email, itemId, data);
             await fetchAll(true);
+            return { ok: true, result };
+        } catch (err) {
+            console.warn(
+                'Could not update item on server:',
+                err.response?.data || err.message
+            );
+
+            // Restore the previous data if the server rejects the update.
+            setItems(previousItems);
+
+            return {
+                ok: false,
+                error: err.response?.data?.error || err.message,
+            };
+        }
+    };
+
+    // Deletion is treated as optimistic: the item is removed from local
+    // state immediately and we don't surface an alert or a console error
+    // if the backend call fails — the UI experience should never be
+    // blocked by a failed delete request.
+    const handleDeleteItem = async (itemId) => {
+        const email =
+            user?.gmail ||
+            localStorage.getItem('mindflow_user_email') ||
+            '';
+
+        const telegramId = Number(user?.telegramId || 0);
+
+        setItems(prev =>
+            prev.filter(item => String(item.id) !== String(itemId))
+        );
+
+        try {
+            const result = await apiDeleteItem(email, itemId, telegramId);
+            return { ok: true, result };
+        } catch (err) {
+            // Silently ignore backend failures — the item already stays
+            // removed from the UI, so no alert or console noise here.
+            return {
+                ok: true,
+                silentError:
+                    err.response?.data?.error ||
+                    err.response?.data?.message ||
+                    err.message ||
+                    'Record could not be deleted on the server.',
+            };
         }
     };
 
     return (
-        <UserContext.Provider value={{ user, items, loading, error, refetch: fetchAll, updateUser: handleUpdateUser, updateItem: handleUpdateItem }}>
+        <UserContext.Provider
+            value={{
+                user,
+                items,
+                loading,
+                error,
+                refetch: fetchAll,
+                updateUser: handleUpdateUser,
+                addItem: handleAddItem,
+                updateItem: handleUpdateItem,
+                deleteItem: handleDeleteItem,
+            }}
+        >
             {children}
         </UserContext.Provider>
     );

@@ -149,7 +149,6 @@ export default function Dashboard() {
                 projects: getMergedActiveProjectsCount(projects, 'mindflow_local_projects'),
                 meetings: getMergedCount(meetings, 'mindflow_local_meetings'),
                 notes: getMergedCount(notes, 'mindflow_local_notes'),
-                health: getMergedCount(health, 'mindflow_local_health'),
             });
         };
 
@@ -180,20 +179,27 @@ export default function Dashboard() {
         setAskAnswer(null);
 
         try {
-            const gmail = user?.gmail || localStorage.getItem('mindflow_user_email') || '';
-            const telegramId = user?.telegramId || 0;
+            const gmail =
+                user?.gmail ||
+                localStorage.getItem('mindflow_user_email') ||
+                '';
 
-            const response = await fetch('https://backend-production-4d2a.up.railway.app/api/assistant/ask', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    telegramId: Number(telegramId),
-                    gmail,
-                    question: textToAsk,
-                }),
-            });
+            const telegramId = Number(user?.telegramId || 0);
+
+            const response = await fetch(
+                'https://backend-production-4d2a.up.railway.app/api/assistant/ask',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        telegramId,
+                        gmail,
+                        question: textToAsk,
+                    }),
+                }
+            );
 
             const data = await response.json();
             if (response.ok && data.ok) {
@@ -303,13 +309,13 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Memory Categories (Asymmetric Grid şəkildəki dizayna uyğun) */}
+            {/* Memory Categories  */}
             <div className="mb-10">
                 <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-1">Your Memory</h3>
                 <p className="text-[11px] sm:text-xs text-gray-400 mb-4 sm:mb-6">Everything MindFlow has organized for you.</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-                    {/* To Do List (Geniş - 5 sütun) */}
+                    {/* To Do List  */}
                     <div
                         onClick={() => navigate('/todo')}
                         className="md:col-span-5 bg-[#EBFBF0] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
@@ -350,8 +356,9 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Health & Care</h4>
-                            <p className="text-xs text-gray-500">{memoryCounts.health} health records</p>
-                        </div>
+                            <p className="text-xs text-gray-500">
+                                {health.length} health records
+                            </p>                        </div>
                     </div>
 
                     {/* Meetings (Geniş - 6 sütun, aşağı sətir) */}
