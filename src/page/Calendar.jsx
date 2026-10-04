@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Calendar as CalendarIcon, ArrowLeft, Edit2, Check } from 'lucide-react';
+import { Calendar as CalendarIcon, ArrowLeft, Edit2, Check, ChevronLeft, ChevronRight, X as XIcon } from 'lucide-react';
 import { useUser } from '../UserContext';
 
 // ---------- Date helpers ----------
@@ -54,7 +54,7 @@ const REFERENCE_TODAY = new Date();
 const TODAY_KEY = toKey(REFERENCE_TODAY);
 
 const START_HOUR = 8;
-const END_HOUR = 19;
+const END_HOUR = 23;
 const HOUR_HEIGHT_DESKTOP = 64;
 const HOUR_HEIGHT_MOBILE = 44;
 const MOBILE_MAX_HEIGHT = 420;
@@ -325,7 +325,7 @@ function getEventLayout(dayEvents) {
 
 // ---------- Week grid ----------
 
-function WeekGrid({ weekStart, events, onSelectEvent }) {
+function WeekGrid({ weekStart, events, onSelectEvent, onSelectDay }) {
     const isMobile = useIsMobile();
     const hourHeight = isMobile ? HOUR_HEIGHT_MOBILE : HOUR_HEIGHT_DESKTOP;
     const scrollRef = useRef(null);
@@ -344,11 +344,17 @@ function WeekGrid({ weekStart, events, onSelectEvent }) {
                 key: toKey(d),
                 label: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
                 date: d.getDate(),
+                fullDate: d,
             };
         });
     }, [weekStart]);
 
-    const nowH = nowFraction();
+    // Real-time 'now' line that updates every minute
+    const [nowH, setNowH] = useState(() => nowFraction());
+    useEffect(() => {
+        const timer = setInterval(() => setNowH(nowFraction()), 60000);
+        return () => clearInterval(timer);
+    }, []);
     const showNowLine = nowH >= START_HOUR && nowH <= END_HOUR;
     const nowTop = (nowH - START_HOUR) * hourHeight;
 
@@ -365,12 +371,17 @@ function WeekGrid({ weekStart, events, onSelectEvent }) {
                 {days.map((d) => {
                     const isToday = d.key === TODAY_KEY;
                     return (
-                        <div key={d.key} className="flex-1 min-w-0 flex flex-col items-center py-2 md:py-3 border-l border-gray-100">
-                            <span className={`text-[9px] sm:text-[10px] md:text-[11px] font-semibold tracking-wide ${isToday ? 'text-[#00C875]' : 'text-gray-400'}`}>
+                        <div
+                            key={d.key}
+                            onClick={() => onSelectDay && onSelectDay(d.key)}
+                            className="flex-1 min-w-0 flex flex-col items-center py-2 md:py-3 border-l border-gray-100 cursor-pointer hover:bg-gray-50 transition"
+                        >
+                            <span className={`text-[9px] sm:text-[10px] md:text-[11px] font-semibold tracking-wide ${isToday ? '' : 'text-gray-400'}`} style={isToday ? { color: '#1E7A5E' } : {}}>
                                 {d.label}
                             </span>
                             <span
-                                className={`mt-1 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs md:text-sm font-bold ${isToday ? 'bg-[#00C875] text-white' : 'text-gray-700'}`}
+                                className={`mt-1 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs md:text-sm font-bold text-white`}
+                                style={isToday ? { backgroundColor: '#1E7A5E' } : { color: '#374151', backgroundColor: 'transparent' }}
                             >
                                 {d.date}
                             </span>
@@ -467,7 +478,7 @@ function WeekGrid({ weekStart, events, onSelectEvent }) {
 
 // ---------- Month view ----------
 
-function MonthGrid({ monthDate, events, onSelectEvent }) {
+function MonthGrid({ monthDate, events, onSelectEvent, onSelectDay }) {
     const safeEvents = Array.isArray(events) ? events : [];
 
     const cells = useMemo(() => {
@@ -504,12 +515,13 @@ function MonthGrid({ monthDate, events, onSelectEvent }) {
                     return (
                         <div
                             key={i}
-                            className={`p-1.5 md:p-2.5 min-h-[75px] md:min-h-[92px] border-gray-100 ${isRightEdge ? '' : 'border-r'} ${isBottomEdge ? '' : 'border-b'
-                                } ${isToday ? 'bg-[#F3FBF7]' : 'bg-white'}`}
+                            onClick={() => onSelectDay && onSelectDay(key)}
+                            className={`p-1.5 md:p-2.5 min-h-[75px] md:min-h-[92px] border-gray-100 cursor-pointer transition hover:bg-gray-50 ${isRightEdge ? '' : 'border-r'} ${isBottomEdge ? '' : 'border-b'
+                                } ${isToday ? 'bg-[#F0FAF6]' : 'bg-white'}`}
                         >
-                            <div className="flex justify-start mb-1">
+                            <div className="flex justify-center mb-1">
                                 {isToday ? (
-                                    <span className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full bg-[#00C875] text-white text-[11px] md:text-xs font-bold">
+                                    <span className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full text-white text-[11px] md:text-xs font-bold" style={{ backgroundColor: '#1E7A5E' }}>
                                         {d.getDate()}
                                     </span>
                                 ) : (
@@ -523,8 +535,8 @@ function MonthGrid({ monthDate, events, onSelectEvent }) {
                                 {visible.map((e, idx) => (
                                     <div
                                         key={e.id ?? idx}
-                                        onClick={() => onSelectEvent(e)}
-                                        className="flex items-center gap-1 text-[10px] md:text-[11px] text-gray-600 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition"
+                                        onClick={(ev) => { ev.stopPropagation(); onSelectEvent(e); }}
+                                        className="flex items-center gap-1 text-[10px] md:text-[11px] text-gray-600 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 transition"
                                     >
                                         <span
                                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -720,6 +732,95 @@ function EventModal({ event, onClose, onLocalSave }) {
     );
 }
 
+// ---------- Day Detail Popup ----------
+
+function DayDetailPopup({ dateKey, events, onClose, onSelectEvent }) {
+    const safeEvents = Array.isArray(events) ? events : [];
+    const dayEvents = safeEvents.filter(e => e.date === dateKey).sort((a, b) => a.start - b.start);
+
+    // Format the date key to a readable string
+    const dateObj = new Date(dateKey + 'T00:00:00');
+    const formattedDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.removeEventListener('keydown', onKey);
+            document.body.style.overflow = prev;
+        };
+    }, [onClose]);
+
+    return createPortal(
+        <div
+            onClick={onClose}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px] mf-overlay-enter"
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                className="bg-white rounded-2xl p-6 w-full max-w-[380px] shadow-2xl relative mf-modal-enter"
+            >
+                <style>{`
+                    @keyframes mfOverlayIn { from { opacity: 0 } to { opacity: 1 } }
+                    @keyframes mfModalIn {
+                        from { opacity: 0; transform: translateY(8px) scale(.96) }
+                        to { opacity: 1; transform: translateY(0) scale(1) }
+                    }
+                    .mf-overlay-enter { animation: mfOverlayIn .16s ease-out }
+                    .mf-modal-enter { animation: mfModalIn .2s cubic-bezier(.16,1,.3,1) }
+                `}</style>
+
+                <button
+                    onClick={onClose}
+                    aria-label="Close"
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition"
+                >
+                    <XIcon size={18} />
+                </button>
+
+                <div className="flex items-center gap-3 mb-5 pr-6">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#1E7A5E18', color: '#1E7A5E' }}>
+                        📅
+                    </div>
+                    <div>
+                        <h3 className="text-base font-bold text-gray-800">{formattedDate}</h3>
+                        <p className="text-xs text-gray-400">{dayEvents.length} event{dayEvents.length !== 1 ? 's' : ''}</p>
+                    </div>
+                </div>
+
+                {dayEvents.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-4">No events for this day.</p>
+                ) : (
+                    <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                        {dayEvents.map((e, idx) => {
+                            const style = EVENT_STYLES[e.color] || EVENT_STYLES.purple;
+                            return (
+                                <div
+                                    key={e.id ?? idx}
+                                    onClick={() => { onClose(); onSelectEvent(e); }}
+                                    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-gray-50 transition"
+                                    style={{ backgroundColor: style.bg + '88' }}
+                                >
+                                    <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: style.text }} />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold truncate" style={{ color: style.text }}>{e.title}</p>
+                                        <p className="text-xs text-gray-400">{formatRange(e.start, e.end)}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>,
+        document.body
+    );
+}
+
 // ---------- Main page ----------
 
 export default function CalendarApp() {
@@ -727,6 +828,7 @@ export default function CalendarApp() {
     const [currentView, setCurrentView] = useState('timeGridWeek');
     const [cursorDate, setCursorDate] = useState(REFERENCE_TODAY);
     const [selectedEvent, setSelectedEvent] = useState(null);
+    const [selectedDay, setSelectedDay] = useState(null);
 
     const { items } = useUser();
 
@@ -794,7 +896,7 @@ export default function CalendarApp() {
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-2 pb-6">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-[#EBFBF0] text-[#00C875] flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ backgroundColor: '#1E7A5E18', color: '#1E7A5E' }}>
                             <CalendarIcon size={22} />
                         </div>
                         <div>
@@ -815,43 +917,45 @@ export default function CalendarApp() {
                         <button
                             onClick={handlePrev}
                             aria-label="Previous"
-                            className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-gray-600 bg-white hover:bg-gray-50 border border-gray-200/80 rounded-xl transition shadow-sm font-bold"
+                            className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-gray-600 bg-white hover:bg-gray-50 border border-gray-200/80 rounded-xl transition shadow-sm"
                         >
-                            &lt;
+                            <ChevronLeft size={16} />
                         </button>
                         <button
                             onClick={handleNext}
                             aria-label="Next"
-                            className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-gray-600 bg-white hover:bg-gray-50 border border-gray-200/80 rounded-xl transition shadow-sm font-bold"
+                            className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-gray-600 bg-white hover:bg-gray-50 border border-gray-200/80 rounded-xl transition shadow-sm"
                         >
-                            &gt;
+                            <ChevronRight size={16} />
                         </button>
-                        <span className="text-sm md:text-base font-bold text-gray-800 ml-1">{title}</span>
+                        <span className="text-sm md:text-base font-light text-gray-800 ml-1">{title}</span>
                     </div>
 
                     <div className="flex items-center bg-gray-200/60 p-1 rounded-xl self-end md:self-auto">
                         <button
                             onClick={() => setCurrentView('dayGridMonth')}
                             className={`px-3 py-1 md:px-4 md:py-1.5 text-xs md:text-sm font-medium rounded-lg transition ${currentView === 'dayGridMonth'
-                                ? 'bg-white text-[#00C875] font-semibold shadow-sm'
+                                ? 'bg-white font-semibold shadow-sm'
                                 : 'text-gray-400 hover:text-gray-600'
                                 }`}
+                            style={currentView === 'dayGridMonth' ? { color: '#1E7A5E' } : {}}
                         >
                             Month
                         </button>
                         <button
                             onClick={() => setCurrentView('timeGridWeek')}
                             className={`px-3 py-1 md:px-4 md:py-1.5 text-xs md:text-sm font-medium rounded-lg transition ${currentView === 'timeGridWeek'
-                                ? 'bg-white text-[#00C875] font-semibold shadow-sm'
+                                ? 'bg-white font-semibold shadow-sm'
                                 : 'text-gray-400 hover:text-gray-600'
                                 }`}
+                            style={currentView === 'timeGridWeek' ? { color: '#1E7A5E' } : {}}
                         >
                             Week
                         </button>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-3xl p-3 md:p-6 shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                     <style>{`
                         @keyframes calendarViewIn {
                             from { opacity: 0; transform: translateY(8px); }
@@ -863,8 +967,8 @@ export default function CalendarApp() {
                     `}</style>
                     <div key={currentView} className="calendar-view-enter">
                         {currentView === 'timeGridWeek'
-                            ? <WeekGrid weekStart={weekStart} events={events} onSelectEvent={setSelectedEvent} />
-                            : <MonthGrid monthDate={startOfMonth(cursorDate)} events={events} onSelectEvent={setSelectedEvent} />}
+                            ? <WeekGrid weekStart={weekStart} events={events} onSelectEvent={setSelectedEvent} onSelectDay={setSelectedDay} />
+                            : <MonthGrid monthDate={startOfMonth(cursorDate)} events={events} onSelectEvent={setSelectedEvent} onSelectDay={setSelectedDay} />}
                     </div>
                 </div>
             </div>
@@ -875,6 +979,16 @@ export default function CalendarApp() {
                     event={selectedEvent}
                     onClose={() => setSelectedEvent(null)}
                     onLocalSave={bumpLocalVersion}
+                />
+            )}
+
+            {/* Day Detail Popup */}
+            {selectedDay && !selectedEvent && (
+                <DayDetailPopup
+                    dateKey={selectedDay}
+                    events={events}
+                    onClose={() => setSelectedDay(null)}
+                    onSelectEvent={(e) => { setSelectedDay(null); setSelectedEvent(e); }}
                 />
             )}
         </div>

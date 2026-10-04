@@ -4,7 +4,7 @@ import { useUser } from '../UserContext';
 import natureImage from "../images/nature.png";
 import {
     CheckSquare,
-    FolderKanban,
+    Briefcase,
     Users,
     FileText,
     HeartPulse,
@@ -164,7 +164,7 @@ export default function Dashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [items]);
 
-    const firstName = user?.firstName || 'Peyman';
+    const firstName = user?.firstName || user?.username || '';
     const summary = buildSummary(safeItems);
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -218,7 +218,7 @@ export default function Dashboard() {
     if (loading) {
         return (
             <div className="flex-1 flex items-center justify-center h-full">
-                <div className="flex items-center gap-2 text-emerald-600">
+                <div className="flex items-center gap-2" style={{ color: '#1E7A5E' }}>
                     <Loader2 className="animate-spin" size={24} />
                     <span className="text-sm font-medium">Loading...</span>
                 </div>
@@ -243,11 +243,12 @@ export default function Dashboard() {
                                 />
                             </div>
                         ) : (
-                            <h1 className="text-xl md:text-2xl font-bold text-gray-900">👋 Good morning, {firstName}</h1>
+                            <h1 className="text-xl md:text-2xl font-bold text-gray-900">👋 Good morning{firstName ? `, ${firstName}` : '!'}</h1>
                         )}
                         <button
                             onClick={isEditingProfile ? handleSaveProfile : handleEditProfile}
-                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isEditingProfile ? 'text-emerald-600 bg-emerald-50' : 'text-gray-400 hover:text-emerald-600 hover:bg-gray-50'}`}
+                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isEditingProfile ? 'bg-[#1E7A5E]/10' : 'text-gray-400 hover:bg-gray-50'}`}
+                            style={isEditingProfile ? { color: '#1E7A5E' } : {}}
                             title={isEditingProfile ? "Save name" : "Edit name"}
                         >
                             {isEditingProfile ? <Check size={18} /> : <Edit2 size={18} />}
@@ -260,20 +261,16 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {error && (
-                <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-6 text-xs text-red-600">
-                    {error}
-                </div>
-            )}
+            {/* Error state is handled gracefully — no banner shown to user */}
 
             {/* AI Daily Summary */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-sm relative mb-6 md:mb-8">
+            <div className="rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-sm relative mb-6 md:mb-8" style={{ backgroundColor: '#F4F2F8' }}>
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
-                    <div className="flex items-center gap-2 text-emerald-600 font-semibold text-xs sm:text-sm">
+                    <div className="flex items-center gap-2 font-semibold text-xs sm:text-sm" style={{ color: '#1E7A5E' }}>
                         <Sparkles size={16} />
                         <span>AI Gündəlik Xülasəsi</span>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-emerald-50/80 text-emerald-600 px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold" style={{ backgroundColor: '#1E7A5E18', color: '#1E7A5E' }}>
                         <Sparkles size={12} />
                         <span>MindFlow AI tərəfindən yaradılıb</span>
                     </div>
@@ -318,13 +315,13 @@ export default function Dashboard() {
                     {/* To Do List  */}
                     <div
                         onClick={() => navigate('/todo')}
-                        className="md:col-span-5 bg-[#EBFBF0] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
+                        className="group md:col-span-5 bg-[#EBFBF0] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52 border-2 border-transparent hover:border-[#1E7A5E]/30"
                     >
-                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-emerald-600 flex items-center justify-center shadow-sm">
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white flex items-center justify-center shadow-sm" style={{ color: '#1E7A5E' }}>
                             <CheckSquare size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">To Do List</h4>
+                            <h4 className="font-bold text-gray-900 group-hover:text-[#1E7A5E] transition-colors text-base md:text-lg mb-1">To Do List</h4>
                             <p className="text-xs text-gray-500">{memoryCounts.tasks} active tasks</p>
                             {urgentTodosCount > 0 && (
                                 <p className="text-[11px] text-rose-500 mt-0.5">{urgentTodosCount} due today</p>
@@ -335,13 +332,13 @@ export default function Dashboard() {
                     {/* Projects (Orta - 4 sütun) */}
                     <div
                         onClick={() => navigate('/projects')}
-                        className="md:col-span-4 bg-[#EDF4FF] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
+                        className="group md:col-span-4 bg-[#EDF4FF] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52 border-2 border-transparent hover:border-blue-300/60"
                     >
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-blue-600 flex items-center justify-center shadow-sm">
-                            <FolderKanban size={20} />
+                            <Briefcase size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Projects</h4>
+                            <h4 className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-base md:text-lg mb-1">Projects</h4>
                             <p className="text-xs text-gray-500">{memoryCounts.projects} active projects</p>
                         </div>
                     </div>
@@ -349,28 +346,27 @@ export default function Dashboard() {
                     {/* Health & Care (Dar - 3 sütun) */}
                     <div
                         onClick={() => navigate('/healthcare')}
-                        className="md:col-span-3 bg-[#FFF1F2] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
+                        className="group md:col-span-3 bg-[#FFF1F2] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52 border-2 border-transparent hover:border-rose-300/60"
                     >
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-rose-500 flex items-center justify-center shadow-sm">
                             <HeartPulse size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Health & Care</h4>
-                            <p className="text-xs text-gray-500">
-                                {health.length} health records
-                            </p>                        </div>
+                            <h4 className="font-bold text-gray-900 group-hover:text-rose-600 transition-colors text-base md:text-lg mb-1">Health & Care</h4>
+                            <p className="text-xs text-gray-500">{health.length} health records</p>
+                        </div>
                     </div>
 
                     {/* Meetings (Geniş - 6 sütun, aşağı sətir) */}
                     <div
                         onClick={() => navigate('/meetings')}
-                        className="md:col-span-6 bg-[#F3EFFE] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
+                        className="group md:col-span-6 bg-[#F3EFFE] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52 border-2 border-transparent hover:border-purple-300/60"
                     >
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-purple-600 flex items-center justify-center shadow-sm">
                             <Users size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Meetings</h4>
+                            <h4 className="font-bold text-gray-900 group-hover:text-purple-700 transition-colors text-base md:text-lg mb-1">Meetings</h4>
                             <p className="text-xs text-gray-500">{memoryCounts.meetings} upcoming</p>
                         </div>
                     </div>
@@ -378,13 +374,13 @@ export default function Dashboard() {
                     {/* Notes (Geniş - 6 sütun, aşağı sətir) */}
                     <div
                         onClick={() => navigate('/notes')}
-                        className="md:col-span-6 bg-[#FFFAEC] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52"
+                        className="group md:col-span-6 bg-[#FFFAEC] rounded-3xl p-6 md:p-8 hover:shadow-md transition cursor-pointer flex flex-col justify-between h-44 md:h-52 border-2 border-transparent hover:border-amber-300/60"
                     >
                         <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-white text-amber-500 flex items-center justify-center shadow-sm">
                             <FileText size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-gray-900 text-base md:text-lg mb-1">Notes</h4>
+                            <h4 className="font-bold text-gray-900 group-hover:text-amber-600 transition-colors text-base md:text-lg mb-1">Notes</h4>
                             <p className="text-xs text-gray-500">{memoryCounts.notes} notes</p>
                         </div>
                     </div>
@@ -452,7 +448,7 @@ export default function Dashboard() {
                 {/* AI Answer Block */}
                 {askAnswer && (
                     <div className="mt-6 pt-6 border-t border-gray-100 flex flex-col gap-3 animate-fadeIn">
-                        <div className="flex items-center gap-2 text-emerald-600 font-semibold text-xs">
+                        <div className="flex items-center gap-2 font-semibold text-xs" style={{ color: '#1E7A5E' }}>
                             <Sparkles size={16} />
                             <span>MindFlow</span>
                         </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
+import MindFlowLogo from '../images/Logo.png';
 
 export default function LoginPage({ onLoginSuccess }) {
     const login = useGoogleLogin({
@@ -25,13 +26,9 @@ export default function LoginPage({ onLoginSuccess }) {
 
     return (
         <div className="min-h-screen bg-[#FAFAFB] flex flex-col items-center justify-center p-4 font-sans">
-            <div className="flex items-center gap-2 mb-8">
-                <div className="w-10 h-10 bg-[#00C875] rounded-xl flex items-center justify-center shadow-sm">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </div>
-                <span className="text-2xl font-bold text-gray-900 tracking-tight">MindFlow</span>
+            {/* Logo at top */}
+            <div className="mb-8">
+                <img src={MindFlowLogo} alt="MindFlow AI" className="h-10 w-auto object-contain" />
             </div>
 
             <div className="w-full max-w-[440px] bg-white border border-gray-100 rounded-3xl p-8 sm:p-10 shadow-sm flex flex-col items-center text-center">
@@ -51,10 +48,10 @@ export default function LoginPage({ onLoginSuccess }) {
                 {/* Google Sign-In Button */}
                 <button
                     onClick={() => login()}
-                    className="w-full h-12 bg-[#16803C] hover:bg-[#126b32] text-white font-medium rounded-2xl flex items-center justify-center gap-3 transition shadow-sm active:scale-[0.99]"
+                    className="w-full h-12 bg-[#1E7A5E] hover:bg-[#175f49] text-white font-medium rounded-2xl flex items-center justify-center gap-3 transition shadow-sm active:scale-[0.99]"
                 >
                     <div className="w-6 h-6 bg-white rounded-md flex items-center justify-center">
-                        <span className="text-[#16803C] font-bold text-sm">G</span>
+                        <span className="text-[#1E7A5E] font-bold text-sm">G</span>
                     </div>
                     <span className="text-sm font-semibold tracking-wide">Continue with Google</span>
                 </button>

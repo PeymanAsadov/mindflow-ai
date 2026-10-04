@@ -29,11 +29,13 @@ export default function Sidebar() {
 
     const firstName = apiUser?.firstName || '';
     const lastName = apiUser?.lastName || '';
-    const fullName = firstName && lastName ? `${firstName} ${lastName}` : (firstName || 'User');
+    const fullName = firstName && lastName ? `${firstName} ${lastName}` : (firstName || apiUser?.username || 'User');
     const email = apiUser?.gmail || localStorage.getItem('mindflow_user_email') || '';
-    const initials = (firstName[0] || '') + (lastName[0] || '') || 'U';
+    // Show username under name if no email
+    const emailDisplay = email || (apiUser?.username ? `@${apiUser.username}` : '');
+    const initials = (firstName[0] || '') + (lastName[0] || '') || (apiUser?.username?.[0]?.toUpperCase() || 'U');
 
-    const user = { name: fullName, email, initials };
+    const user = { name: fullName, email: emailDisplay, initials };
 
     const handleLogout = () => {
         navigate('/logout');
@@ -63,7 +65,7 @@ export default function Sidebar() {
 
     return (
         <>
-            {/* Mobil Header və Açma/Bağlama Düyməsi */}
+            {/* Mobil Header */}
             <div className="md:hidden flex items-center justify-between bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-50 w-full">
                 <div
                     onClick={() => navigate('/dashboard')}
@@ -80,7 +82,7 @@ export default function Sidebar() {
                 </button>
             </div>
 
-            {/* Mobil üçün Overlay fon */}
+            {/* Mobil Overlay */}
             {mobileOpen && (
                 <div
                     onClick={() => setMobileOpen(false)}
@@ -88,26 +90,26 @@ export default function Sidebar() {
                 />
             )}
 
-            {/* Sidebar Konteyneri (Mobil üçün Drawer, Kompüter üçün Sticky Sidebar) */}
+            {/* Sidebar */}
             <aside
                 className={`w-64 bg-white border-r border-gray-100 flex flex-col justify-between p-6 flex-shrink-0 h-screen fixed md:sticky top-0 z-50 transition-transform duration-300 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
                     }`}
             >
                 <div>
-                    {/* Logo hissəsi (Həm mobil drawer, həm də kompüter sidebar üçün yuxarıda görünür) */}
+                    {/* Logo — no scale on hover */}
                     <div
                         onClick={() => {
                             navigate('/dashboard');
                             setMobileOpen(false);
                         }}
-                        className="flex items-center gap-3 mb-8 cursor-pointer group"
+                        className="flex items-center gap-3 mb-8 cursor-pointer"
                     >
-                        <div className="w-36 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition group-hover:scale-105 overflow-hidden">
+                        <div className="w-36 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
                             <img src={MindFlowLogo} alt="MindFlow AI" className="w-full h-full object-contain" />
                         </div>
                     </div>
 
-                    {/* Naviqasiya menyusu */}
+                    {/* Nav menu */}
                     <nav className="space-y-1">
                         {sidebarItems.map((item) => {
                             const isDashboardActive = item.path === '/dashboard' && (
@@ -127,11 +129,11 @@ export default function Sidebar() {
                                     key={item.path}
                                     onClick={() => handleItemClick(item.path)}
                                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition text-left ${isActive
-                                        ? 'bg-[#EBFBF0] text-[#00C875]'
-                                        : 'text-gray-500 hover:bg-gray-50'
+                                        ? 'bg-[#1E7A5E]/10 text-[#1E7A5E]'
+                                        : 'text-gray-500 hover:bg-[#1E7A5E]/10 hover:text-[#1E7A5E]'
                                         }`}
                                 >
-                                    <span className={isActive ? 'text-[#00C875]' : 'text-gray-400'}>
+                                    <span className={isActive ? 'text-[#1E7A5E]' : 'text-gray-400 group-hover:text-[#1E7A5E]'}>
                                         {item.icon}
                                     </span>
                                     <span className="text-sm">{item.label}</span>
@@ -141,10 +143,10 @@ export default function Sidebar() {
                     </nav>
                 </div>
 
-                {/* Profil və Log out hissəsi */}
+                {/* Profile & Logout */}
                 <div className="space-y-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center gap-2 px-2">
-                        <div className="w-10 h-10 rounded-full bg-[#EBFBF0] text-[#00C875] flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-[#1E7A5E]/10 text-[#1E7A5E] flex items-center justify-center font-bold text-sm flex-shrink-0">
                             {user.initials}
                         </div>
                         <div className="overflow-hidden flex-1">
@@ -154,21 +156,21 @@ export default function Sidebar() {
                                         type="text"
                                         value={editFirstName}
                                         onChange={(e) => setEditFirstName(e.target.value)}
-                                        className="text-sm font-bold text-gray-900 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
+                                        className="text-sm font-bold text-gray-900 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#1E7A5E] transition-colors"
                                         placeholder="First Name"
                                     />
                                     <input
                                         type="text"
                                         value={editLastName}
                                         onChange={(e) => setEditLastName(e.target.value)}
-                                        className="text-xs text-gray-700 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
+                                        className="text-xs text-gray-700 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#1E7A5E] transition-colors"
                                         placeholder="Last Name"
                                     />
                                     <input
                                         type="email"
                                         value={editEmail}
                                         onChange={(e) => setEditEmail(e.target.value)}
-                                        className="text-xs text-gray-500 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#00C875] transition-colors"
+                                        className="text-xs text-gray-500 w-full border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#1E7A5E] transition-colors"
                                         placeholder="Email Address"
                                     />
                                 </div>
@@ -182,8 +184,8 @@ export default function Sidebar() {
                         <button
                             onClick={isEditingProfile ? handleSaveClick : handleEditClick}
                             className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isEditingProfile
-                                ? 'text-[#00C875] bg-[#EBFBF0]'
-                                : 'text-gray-400 hover:text-[#00C875] hover:bg-gray-50'
+                                ? 'text-[#1E7A5E] bg-[#1E7A5E]/10'
+                                : 'text-gray-400 hover:text-[#1E7A5E] hover:bg-gray-50'
                                 }`}
                             title={isEditingProfile ? "Save Profile" : "Edit Profile"}
                         >
@@ -191,9 +193,10 @@ export default function Sidebar() {
                         </button>
                     </div>
 
+                    {/* Logout — default neutral, red only on hover */}
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-red-600 bg-red-50 hover:bg-red-100 transition text-left"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition text-left"
                     >
                         <LogOut size={20} />
                         <span className="text-sm">Log out</span>

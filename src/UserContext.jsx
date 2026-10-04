@@ -97,8 +97,14 @@ export function UserProvider({ children }) {
                 mountedRef.current &&
                 requestId === requestIdRef.current
             ) {
+                // Only show error if we have no cached data yet (first load failure)
                 if (!isBackground) {
-                    setError('Failed to load data from server.');
+                    // Check if we already have user data — if so, don't show error
+                    const hasExistingData = !!localStorage.getItem('mindflow_user_email');
+                    if (!hasExistingData) {
+                        setError('Failed to load data from server.');
+                    }
+                    // If we have an email configured it's likely a transient network error — stay silent
                 }
 
                 console.warn(
