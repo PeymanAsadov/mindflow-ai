@@ -27,8 +27,7 @@ const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 function getFileKind(file) {
     const type = (file?.type || file?.mime || file?.mime_type || '').toLowerCase();
     const name = (file?.name || file?.file_name || '').toLowerCase();
-    const ext = name.
-    split('.').pop();
+    const ext = name.split('.').pop();
 
     if (
         type.startsWith('image/') ||
@@ -108,6 +107,31 @@ function safeSetLocalHealth(data) {
     }
 }
 
+// Converts any date-like value to a local YYYY-MM-DD string ('' if invalid).
+function toLocalISODate(value) {
+    if (!value) return '';
+    const str = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return '';
+
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function todayISO() {
+    return toLocalISODate(new Date());
+}
+
+function formatDisplayDate(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y}`;
+}
+
 function parseFiles(value) {
     if (!value) return [];
 
@@ -152,6 +176,9 @@ export default function HealthCare() {
     const [isReadingFile, setIsReadingFile] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [fileSizeWarning, setFileSizeWarning] = useState('');
+
+    const [recordDate, setRecordDate] = useState(todayISO());
+    const [filterDate, setFilterDate] = useState(''); // empty = all dates
 
     const [previewFile, setPreviewFile] = useState(null);
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -219,6 +246,14 @@ export default function HealthCare() {
                         item.fields?.description ||
                         item.fields?.notes ||
                         '',
+                    // Prefer the explicit visit date; fall back to the
+                    // creation date (e.g. records added via the Telegram bot).
+                    date: toLocalISODate(
+                        item.fields?.visit_date ||
+                        item.fields?.date ||
+                        item.created_at ||
+                        item.createdAt
+                    ),
                     files: parseFiles(item.fields?.files),
                 };
             });
@@ -304,6 +339,7 @@ export default function HealthCare() {
         setNotes('');
         setSelectedFile(null);
         setFileSizeWarning('');
+        setRecordDate(filterDate || todayISO());
         setIsAddModalOpen(true);
     };
 
@@ -314,6 +350,7 @@ export default function HealthCare() {
         setNotes(record.description || '');
         setSelectedFile(record.files?.[0] || null);
         setFileSizeWarning('');
+        setRecordDate(record.date || todayISO());
         setIsAddModalOpen(true);
     };
 
@@ -349,6 +386,9 @@ export default function HealthCare() {
             doctor: formattedDoctor,
             category: reasonForVisit.trim() || 'General consultation',
             description: notes.trim(),
+            // Stored as `visit_date` (not `date`) to avoid clashing with a
+            // backend field of the same name.
+            visit_date: recordDate || todayISO(),
             files: JSON.stringify(backendFilesArray),
         };
 
@@ -440,6 +480,7 @@ export default function HealthCare() {
             setNotes('');
             setSelectedFile(null);
             setFileSizeWarning('');
+            setRecordDate(todayISO());
 
             await fetchAll(true);
         } catch (err) {
@@ -576,6 +617,11 @@ export default function HealthCare() {
         }
     };
 
+    // Records shown in the list: filtered by the selected date (if any).
+    const visibleRecords = filterDate
+        ? localRecords.filter(r => r.date === filterDate)
+        : localRecords;
+
     if (loading) {
         return (
             <div className="flex-1 flex items-center justify-center h-full">
@@ -629,24 +675,42 @@ export default function HealthCare() {
                 </div>
             )}
 
-            <div className="mb-4 flex justify-between items-center px-1">
+            <div className="mb-4 flex flex-wrap justify-between items-center gap-3 px-1">
                 <h2 className="text-xs sm:text-sm font-bold text-gray-800 uppercase tracking-wider">
                     Existing records
                 </h2>
-                <span className="text-xs font-medium text-gray-400">
-                    {localRecords.length} records
-                </span>
+
+                <div className="flex items-center gap-2">
+                    <input
+                        type="date"
+                        value={filterDate}
+                        onChange={e => setFilterDate(e.target.value)}
+                        className="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-rose-500 transition"
+                    />
+                    {filterDate && (
+                        <button
+                            type="button"
+                            onClick={() => setFilterDate('')}
+                            className="text-xs font-semibold text-gray-500 hover:text-gray-700 transition"
+                        >
+                            Hamısı
+                        </button>
+                    )}
+                    <span className="text-xs font-medium text-gray-400">
+                        {visibleRecords.length} records
+                    </span>
+                </div>
             </div>
 
             <div className="space-y-2.5">
-                {localRecords.length === 0 ? (
+                {visibleRecords.length === 0 ? (
                     <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm p-8 text-center text-gray-400 text-xs">
-                        Hələ ki heç bir tibbi qeyd əlavə olunmayıb.
-                        Yuxarıdakı "Add record" düyməsi vasitəsilə
-                        və ya Telegram botu ilə əlavə edə bilərsiniz.
+                        {filterDate
+                            ? 'Bu tarixdə heç bir tibbi qeyd yoxdur.'
+                            : 'Hələ ki heç bir tibbi qeyd əlavə olunmayıb. Yuxarıdakı "Add record" düyməsi vasitəsilə və ya Telegram botu ilə əlavə edə bilərsiniz.'}
                     </div>
                 ) : (
-                    localRecords.map(record => (
+                    visibleRecords.map(record => (
                         <HealthCard
                             key={record.id}
                             record={record}
@@ -756,6 +820,18 @@ export default function HealthCare() {
                                     value={reasonForVisit}
                                     onChange={e => setReasonForVisit(e.target.value)}
                                     placeholder="e.g. Annual check-up"
+                                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-gray-50/50 border border-gray-200 rounded-xl outline-none focus:border-rose-500 focus:bg-white transition"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                    Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={recordDate}
+                                    onChange={e => setRecordDate(e.target.value)}
                                     className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-gray-50/50 border border-gray-200 rounded-xl outline-none focus:border-rose-500 focus:bg-white transition"
                                 />
                             </div>
@@ -1095,6 +1171,7 @@ function HealthCard({
                             </h3>
                             <p className="text-xs font-medium text-gray-400 mt-0.5">
                                 {record.category}
+                                {record.date && ` • ${formatDisplayDate(record.date)}`}
                             </p>
                         </div>
                     </div>
