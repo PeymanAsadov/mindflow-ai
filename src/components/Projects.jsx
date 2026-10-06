@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../UserContext';
+import { markDeleted } from '../utils/memoryStore';
 import { ChevronLeft, FolderKanban, Sparkles, Plus, X, Users, Calendar, Trash2, Edit3 } from 'lucide-react';
 
 export default function Projects() {
     const navigate = useNavigate();
-    const { items, loading, error, addItem, updateItem } = useUser();
+    const { items, loading, error, addItem, updateItem, deleteItem } = useUser();
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState(null);
@@ -32,7 +33,17 @@ export default function Projects() {
     });
 
     useEffect(() => {
-        const rawProjects = Array.isArray(items) ? items.filter(i => i.category === 'projects') : [];
+        const deletedIds = new Set(
+            JSON.parse(
+                localStorage.getItem('mindflow_deleted_item_ids') || '[]'
+            ).map(String)
+        );
+
+        const rawProjects = Array.isArray(items)
+            ? items.filter(
+                i => i.category === 'projects' && !deletedIds.has(String(i.id))
+            )
+            : [];
         const formattedProjects = rawProjects.map(item => ({
             id: item.id,
             title: item.fields?.title || 'Project',
@@ -48,7 +59,9 @@ export default function Projects() {
         }));
 
         setLocalProjects(prev => {
-            const localOnly = prev.filter(p => String(p.id).startsWith('local-'));
+            const localOnly = prev.filter(
+                p => String(p.id).startsWith('local-') && !deletedIds.has(String(p.id))
+            );
             const existingIds = new Set(formattedProjects.map(p => p.id));
             const uniqueLocalOnly = localOnly.filter(p => !existingIds.has(p.id));
             const combined = [...uniqueLocalOnly, ...formattedProjects];
@@ -154,15 +167,21 @@ export default function Projects() {
 
         setIsAddModalOpen(false);
         setEditingProjectId(null);
+        window.dispatchEvent(new Event('mindflow:data-changed'));
     };
 
     // Silmə funksiyası
     const deleteProject = (id) => {
+        markDeleted(id); // həmişə, backend cavabından asılı olmayaraq
+
         setLocalProjects(prev => {
-            const updated = prev.filter(p => p.id !== id);
+            const updated = prev.filter(p => String(p.id) !== String(id));
             localStorage.setItem('mindflow_local_projects', JSON.stringify(updated));
             return updated;
         });
+
+        if (deleteItem) deleteItem(id).catch(() => {});
+
         if (swipedId === id) setSwipedId(null);
         if (viewingProject?.id === id) setViewingProject(null);
     };

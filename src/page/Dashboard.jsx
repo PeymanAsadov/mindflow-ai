@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../UserContext';
 import natureImage from "../images/nature.png";
+import {
+    TASK_CATEGORIES,
+    HEALTH_CATEGORIES,
+    categoryIn,
+    countMerged,
+    getDeletedIds,
+} from '../utils/memoryStore';
 import {
     CheckSquare,
     Briefcase,
@@ -34,7 +41,7 @@ function buildSummary(items) {
         };
     }
 
-    const todos = items.filter(i => i.category === 'todo');
+    const todos = items.filter(i => categoryIn(i, TASK_CATEGORIES));
     const latestTodo = todos[0];
     const totalCount = items.length;
 
@@ -54,43 +61,6 @@ function buildSummary(items) {
             ? `Scheduled for ${latestTodo.fields?.date || ''} ${latestTodo.fields?.time ? 'at ' + latestTodo.fields.time : ''} (Added via Telegram Bot).`
             : null,
     };
-}
-
-function getMergedCount(rawItems, storageKey) {
-    let saved = [];
-    try {
-        const raw = localStorage.getItem(storageKey);
-        saved = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-        saved = [];
-    }
-
-    const safeSaved = Array.isArray(saved) ? saved : [];
-    const localOnly = safeSaved.filter(i => String(i?.id).startsWith('local-'));
-    const existingIds = new Set(rawItems.map(i => i.id));
-    const uniqueLocalOnly = localOnly.filter(i => !existingIds.has(i.id));
-
-    return rawItems.length + uniqueLocalOnly.length;
-}
-
-function getMergedActiveProjectsCount(rawItems, storageKey) {
-    let saved = [];
-    try {
-        const raw = localStorage.getItem(storageKey);
-        saved = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-        saved = [];
-    }
-
-    const safeSaved = Array.isArray(saved) ? saved : [];
-    const localOnly = safeSaved.filter(i => String(i?.id).startsWith('local-'));
-    const existingIds = new Set(rawItems.map(i => i.id));
-    const uniqueLocalOnly = localOnly.filter(i => !existingIds.has(i.id));
-
-    const rawActiveCount = rawItems.filter(i => (i.fields?.status || 'Active') === 'Active').length;
-    const localActiveCount = uniqueLocalOnly.filter(i => (i.status || 'Active') === 'Active').length;
-
-    return rawActiveCount + localActiveCount;
 }
 
 export default function Dashboard() {
@@ -120,55 +90,74 @@ export default function Dashboard() {
     const [askAnswer, setAskAnswer] = useState(null);
     const [askError, setAskError] = useState(null);
 
-    const [memoryCounts, setMemoryCounts] = useState({
-        tasks: 0,
-        projects: 0,
-        meetings: 0,
-        notes: 0,
-        health: 0,
-    });
+    // Bumped whenever localStorage data changes, so counts are recomputed.
+    const [dataVersion, setDataVersion] = useState(0);
 
     useEffect(() => {
         const interval = setInterval(() => setCurrentDate(formatToday()), 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 
-    const safeItems = Array.isArray(items) ? items : [];
-
-    const todos = safeItems.filter(i => i.category === 'todo');
-    const projects = safeItems.filter(i => i.category === 'projects');
-    const meetings = safeItems.filter(i => i.category === 'meetings');
-    const notes = safeItems.filter(i => i.category === 'notes');
-    const health = safeItems.filter(i => i.category === 'health' || i.category === 'health & care');
-    const tasksRaw = safeItems.filter(i => i.category === 'tasks');
-
     useEffect(() => {
-        const recalc = () => {
-            setMemoryCounts({
-                tasks: getMergedCount(tasksRaw, 'mindflow_local_tasks'),
-                projects: getMergedActiveProjectsCount(projects, 'mindflow_local_projects'),
-                meetings: getMergedCount(meetings, 'mindflow_local_meetings'),
-                notes: getMergedCount(notes, 'mindflow_local_notes'),
-            });
-        };
+        const bump = () => setDataVersion(v => v + 1);
 
-        recalc();
-
-        window.addEventListener('storage', recalc);
-        window.addEventListener('focus', recalc);
+        window.addEventListener('storage', bump);
+        window.addEventListener('focus', bump);
+        window.addEventListener('mindflow:data-changed', bump);
 
         return () => {
-            window.removeEventListener('storage', recalc);
-            window.removeEventListener('focus', recalc);
+            window.removeEventListener('storage', bump);
+            window.removeEventListener('focus', bump);
+            window.removeEventListener('mindflow:data-changed', bump);
+        };
+    }, []);
+
+    // Everything below is derived from `items` + localStorage, minus deleted ids.
+    const { visibleItems, todos, memoryCounts } = useMemo(() => {
+        const deleted = getDeletedIds();
+        const safeItems = (Array.isArray(items) ? items : []).filter(
+            i => !deleted.has(String(i.id))
+        );
+
+        const todoItems = safeItems.filter(i => categoryIn(i, TASK_CATEGORIES));
+        const projectItems = safeItems.filter(i => categoryIn(i, ['projects']));
+        const meetingItems = safeItems.filter(i => categoryIn(i, ['meetings']));
+        const noteItems = safeItems.filter(i => categoryIn(i, ['notes']));
+        const healthItems = safeItems.filter(i => categoryIn(i, HEALTH_CATEGORIES));
+
+        return {
+            visibleItems: safeItems,
+            todos: todoItems,
+            memoryCounts: {
+                // only open (not completed) tasks
+                tasks: countMerged(
+                    todoItems,
+                    'mindflow_local_tasks',
+                    i => !i.fields?.completed,
+                    i => !i.completed
+                ),
+                // only active projects
+                projects: countMerged(
+                    projectItems,
+                    'mindflow_local_projects',
+                    i => (i.fields?.status || 'Active') === 'Active',
+                    i => (i.status || 'Active') === 'Active'
+                ),
+                meetings: countMerged(meetingItems, 'mindflow_local_meetings'),
+                notes: countMerged(noteItems, 'mindflow_local_notes'),
+                health: countMerged(healthItems, 'mindflow_local_health'),
+            },
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [items]);
+    }, [items, dataVersion]);
 
     const firstName = user?.firstName || user?.username || '';
-    const summary = buildSummary(safeItems);
+    const summary = buildSummary(visibleItems);
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const urgentTodosCount = todos.filter(i => i.fields?.date === todayStr || i.fields?.isUrgent).length;
+    const urgentTodosCount = todos.filter(
+        i => !i.fields?.completed && (i.fields?.date === todayStr || i.fields?.isUrgent)
+    ).length;
 
     const handleAskSubmit = async (queryText) => {
         const textToAsk = queryText || question;
@@ -353,7 +342,7 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <h4 className="font-bold text-gray-900 group-hover:text-rose-600 transition-colors text-base md:text-lg mb-1">Health & Care</h4>
-                            <p className="text-xs text-gray-500">{health.length} health records</p>
+                            <p className="text-xs text-gray-500">{memoryCounts.health} health records</p>
                         </div>
                     </div>
 

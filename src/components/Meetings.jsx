@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../UserContext';
+import { markDeleted } from '../utils/memoryStore';
 import { Users, Clock, MapPin, Sparkles, ChevronLeft, Loader2, Plus, X, ArrowRight, User, Link as LinkIcon, Trash2, Edit3, Calendar as CalendarIcon } from 'lucide-react';
 
 export default function Meetings() {
     const navigate = useNavigate();
-    const { items, loading, error, addItem, updateItem } = useUser();
+    const { items, loading, error, addItem, updateItem, deleteItem } = useUser();
 
     const [selectedTab, setSelectedTab] = useState('Upcoming'); // Upcoming, Past, All
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -33,7 +34,17 @@ export default function Meetings() {
     });
 
     useEffect(() => {
-        const rawMeetings = Array.isArray(items) ? items.filter(i => i.category === 'meetings') : [];
+        const deletedIds = new Set(
+            JSON.parse(
+                localStorage.getItem('mindflow_deleted_item_ids') || '[]'
+            ).map(String)
+        );
+
+        const rawMeetings = Array.isArray(items)
+            ? items.filter(
+                i => i.category === 'meetings' && !deletedIds.has(String(i.id))
+            )
+            : [];
         const formattedMeetings = rawMeetings.map(item => ({
             id: item.id,
             title: item.fields?.title || 'Meeting',
@@ -47,7 +58,9 @@ export default function Meetings() {
         }));
 
         setLocalMeetings(prev => {
-            const localOnly = prev.filter(p => String(p.id).startsWith('local-'));
+            const localOnly = prev.filter(
+                p => String(p.id).startsWith('local-') && !deletedIds.has(String(p.id))
+            );
             const existingIds = new Set(formattedMeetings.map(p => p.id));
             const uniqueLocalOnly = localOnly.filter(p => !existingIds.has(p.id));
             const combined = [...uniqueLocalOnly, ...formattedMeetings];
@@ -153,15 +166,21 @@ export default function Meetings() {
 
         setIsAddModalOpen(false);
         setEditingMeetingId(null);
+        window.dispatchEvent(new Event('mindflow:data-changed'));
     };
 
     // Silmə funksiyası
     const handleDeleteMeeting = (id) => {
+        markDeleted(id); // həmişə, backend cavabından asılı olmayaraq
+
         setLocalMeetings(prev => {
-            const updated = prev.filter(m => m.id !== id);
+            const updated = prev.filter(m => String(m.id) !== String(id));
             localStorage.setItem('mindflow_local_meetings', JSON.stringify(updated));
             return updated;
         });
+
+        if (deleteItem) deleteItem(id).catch(() => {});
+
         if (swipedId === id) setSwipedId(null);
         if (viewingMeeting?.id === id) setViewingMeeting(null);
     };

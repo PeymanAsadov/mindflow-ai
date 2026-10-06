@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../UserContext';
+import { markDeleted, TASK_CATEGORIES } from '../utils/memoryStore';
 import { ChevronLeft, CheckSquare, Sparkles, Plus, X, Trash2, Edit3, Calendar, Clock } from 'lucide-react';
 
 export default function ToDoList() {
     const navigate = useNavigate();
-    const { items, loading, error, addItem, updateItem } = useUser();
+    const { items, loading, error, addItem, updateItem, deleteItem } = useUser();
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingTaskId, setEditingTaskId] = useState(null);
@@ -32,7 +33,17 @@ export default function ToDoList() {
     });
 
     useEffect(() => {
-        const rawTasks = Array.isArray(items) ? items.filter(i => i.category === 'tasks') : [];
+        const deletedIds = new Set(
+            JSON.parse(
+                localStorage.getItem('mindflow_deleted_item_ids') || '[]'
+            ).map(String)
+        );
+
+        const rawTasks = Array.isArray(items)
+            ? items.filter(
+                i => TASK_CATEGORIES.includes(i.category) && !deletedIds.has(String(i.id))
+            )
+            : [];
         const formattedTasks = rawTasks.map(item => ({
             id: item.id,
             title: item.fields?.title || 'Task',
@@ -47,7 +58,9 @@ export default function ToDoList() {
         }));
 
         setLocalTasks(prev => {
-            const localOnly = prev.filter(t => String(t.id).startsWith('local-'));
+            const localOnly = prev.filter(
+                t => String(t.id).startsWith('local-') && !deletedIds.has(String(t.id))
+            );
             const existingIds = new Set(formattedTasks.map(t => t.id));
             const uniqueLocalOnly = localOnly.filter(t => !existingIds.has(t.id));
             const combined = [...uniqueLocalOnly, ...formattedTasks];
@@ -130,7 +143,7 @@ export default function ToDoList() {
 
             // Backend sync
             try {
-                const rawTasks = Array.isArray(items) ? items.filter(i => i.category === 'tasks') : [];
+                const rawTasks = Array.isArray(items) ? items.filter(i => TASK_CATEGORIES.includes(i.category)) : [];
                 const rawTask = rawTasks.find(i => i.id === editingTaskId);
                 if (updateItem && rawTask) {
                     await updateItem(editingTaskId, {
@@ -169,6 +182,7 @@ export default function ToDoList() {
 
         setIsAddModalOpen(false);
         setEditingTaskId(null);
+        window.dispatchEvent(new Event('mindflow:data-changed'));
     };
 
     const toggleComplete = async (id) => {
@@ -178,8 +192,10 @@ export default function ToDoList() {
             return updated;
         });
 
+        window.dispatchEvent(new Event('mindflow:data-changed'));
+
         try {
-            const rawTasks = Array.isArray(items) ? items.filter(i => i.category === 'tasks') : [];
+            const rawTasks = Array.isArray(items) ? items.filter(i => TASK_CATEGORIES.includes(i.category)) : [];
             const rawTask = rawTasks.find(i => i.id === id);
             if (updateItem && rawTask) {
                 await updateItem(id, {
@@ -193,11 +209,16 @@ export default function ToDoList() {
     };
 
     const deleteTask = (id) => {
+        markDeleted(id); // həmişə, backend cavabından asılı olmayaraq
+
         setLocalTasks(prev => {
-            const updated = prev.filter(t => t.id !== id);
+            const updated = prev.filter(t => String(t.id) !== String(id));
             localStorage.setItem('mindflow_local_tasks', JSON.stringify(updated));
             return updated;
         });
+
+        if (deleteItem) deleteItem(id).catch(() => {});
+
         if (swipedId === id) setSwipedId(null);
         if (viewingTask?.id === id) setViewingTask(null);
     };

@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../UserContext';
+import { markDeleted } from '../utils/memoryStore';
 import { FileText, ChevronLeft, Loader2, Edit2, Check, Plus, X, Sparkles, Trash2 } from 'lucide-react';
 
 export default function Notes() {
     const navigate = useNavigate();
-    const { items, loading, error, updateItem, addItem } = useUser();
+    const { items, loading, error, updateItem, addItem, deleteItem } = useUser();
 
     const [editingId, setEditingId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
@@ -24,7 +25,17 @@ export default function Notes() {
     });
 
     useEffect(() => {
-        const rawNotes = Array.isArray(items) ? items.filter(i => i.category === 'notes') : [];
+        const deletedIds = new Set(
+            JSON.parse(
+                localStorage.getItem('mindflow_deleted_item_ids') || '[]'
+            ).map(String)
+        );
+
+        const rawNotes = Array.isArray(items)
+            ? items.filter(
+                i => i.category === 'notes' && !deletedIds.has(String(i.id))
+            )
+            : [];
         const formattedNotes = rawNotes.map(item => ({
             id: item.id,
             title: item.fields?.title || 'Note',
@@ -33,7 +44,9 @@ export default function Notes() {
         }));
 
         setLocalNotes(prev => {
-            const localOnly = prev.filter(n => String(n.id).startsWith('local-'));
+            const localOnly = prev.filter(
+                n => String(n.id).startsWith('local-') && !deletedIds.has(String(n.id))
+            );
             const existingIds = new Set(formattedNotes.map(n => n.id));
             const uniqueLocalOnly = localOnly.filter(n => !existingIds.has(n.id));
             const combined = [...uniqueLocalOnly, ...formattedNotes];
@@ -79,6 +92,7 @@ export default function Notes() {
         }
 
         setEditingId(null);
+        window.dispatchEvent(new Event('mindflow:data-changed'));
     };
 
     const handleCreateNote = async (e) => {
@@ -98,6 +112,8 @@ export default function Notes() {
             return updated;
         });
 
+        window.dispatchEvent(new Event('mindflow:data-changed'));
+
         if (addItem) {
             await addItem({
                 category: 'notes',
@@ -115,11 +131,16 @@ export default function Notes() {
     };
 
     const handleDeleteNote = (id) => {
+        markDeleted(id); // həmişə, backend cavabından asılı olmayaraq
+
         setLocalNotes(prev => {
-            const updated = prev.filter(n => n.id !== id);
+            const updated = prev.filter(n => String(n.id) !== String(id));
             localStorage.setItem('mindflow_local_notes', JSON.stringify(updated));
             return updated;
         });
+
+        if (deleteItem) deleteItem(id).catch(() => {});
+
         if (editingId === id) setEditingId(null);
     };
 

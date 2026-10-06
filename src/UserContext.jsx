@@ -76,13 +76,21 @@ export function UserProvider({ children }) {
                     localStorage.getItem('mindflow_item_updates') || '{}'
                 );
 
-                mergedItems = mergedItems.map(item => {
-                    const localUpdate = itemUpdates[item.id];
+                const deletedItemIds = new Set(
+                    JSON.parse(
+                        localStorage.getItem('mindflow_deleted_item_ids') || '[]'
+                    ).map(String)
+                );
 
-                    return localUpdate
-                        ? { ...item, ...localUpdate }
-                        : item;
-                });
+                mergedItems = mergedItems
+                    .filter(item => !deletedItemIds.has(String(item.id)))
+                    .map(item => {
+                        const localUpdate = itemUpdates[item.id];
+
+                        return localUpdate
+                            ? { ...item, ...localUpdate }
+                            : item;
+                    });
             } catch (storageError) {
                 console.warn('Could not merge local updates:', storageError);
             }
@@ -190,6 +198,7 @@ export function UserProvider({ children }) {
 
             // Refresh only after the server confirms creation.
             await fetchAll(true);
+            window.dispatchEvent(new Event('mindflow:data-changed'));
 
             return {
                 ok: true,
@@ -245,6 +254,7 @@ export function UserProvider({ children }) {
                 'mindflow_item_updates',
                 JSON.stringify(local)
             );
+            window.dispatchEvent(new Event('mindflow:data-changed'));
         } catch (err) {
             console.warn('Could not save local item update:', err);
         }
@@ -254,18 +264,30 @@ export function UserProvider({ children }) {
             await fetchAll(true);
             return { ok: true, result };
         } catch (err) {
+            // If the server returned an explicit error response (4xx / 5xx),
+            // roll back the optimistic update and surface the error.
+            if (err.response) {
+                console.warn(
+                    'Could not update item on server:',
+                    err.response.data || err.message
+                );
+                setItems(previousItems);
+                return {
+                    ok: false,
+                    error: err.response.data?.error || err.message,
+                };
+            }
+
+            // No response at all (CORS preflight blocked, network down, etc.).
+            // The optimistic state update and localStorage write already
+            // happened above, so the user sees their edit immediately and it
+            // survives a page reload via the mindflow_item_updates merge.
+            // Log quietly but do NOT roll back and do NOT alert the user.
             console.warn(
-                'Could not update item on server:',
-                err.response?.data || err.message
+                'Could not sync item update to server (no response):',
+                err.message
             );
-
-            // Restore the previous data if the server rejects the update.
-            setItems(previousItems);
-
-            return {
-                ok: false,
-                error: err.response?.data?.error || err.message,
-            };
+            return { ok: true };
         }
     };
 
@@ -281,9 +303,27 @@ export function UserProvider({ children }) {
 
         const telegramId = Number(user?.telegramId || 0);
 
+        // Store in local deleted items set so fetchAll never resurrects it
+        try {
+            const deleted = new Set(
+                JSON.parse(
+                    localStorage.getItem('mindflow_deleted_item_ids') || '[]'
+                ).map(String)
+            );
+            deleted.add(String(itemId));
+            localStorage.setItem(
+                'mindflow_deleted_item_ids',
+                JSON.stringify(Array.from(deleted))
+            );
+        } catch (err) {
+            console.warn('Could not save deleted item ID:', err);
+        }
+
         setItems(prev =>
             prev.filter(item => String(item.id) !== String(itemId))
         );
+
+        window.dispatchEvent(new Event('mindflow:data-changed'));
 
         try {
             const result = await apiDeleteItem(email, itemId, telegramId);

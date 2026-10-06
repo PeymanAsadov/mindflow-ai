@@ -405,11 +405,14 @@ export default function HealthCare() {
                 }
 
                 const result = await updateItem(editingRecordId, {
-                    ...rawRecord,
-                    fields: {
-                        ...rawRecord.fields,
-                        ...fields,
-                    },
+                    telegramId:
+                        rawRecord.telegramId ??
+                        user?.telegramId ??
+                        user?.telegram_id ??
+                        0,
+                    gmail: email,
+                    category: rawRecord.category || 'health',
+                    fields,
                 });
 
                 if (result?.ok === false) {
@@ -518,6 +521,16 @@ export default function HealthCare() {
                     'mindflow_deleted_health_ids',
                     JSON.stringify([...updated])
                 );
+                const globalDeleted = new Set(
+                    JSON.parse(
+                        localStorage.getItem('mindflow_deleted_item_ids') || '[]'
+                    ).map(String)
+                );
+                globalDeleted.add(deletedId);
+                localStorage.setItem(
+                    'mindflow_deleted_item_ids',
+                    JSON.stringify(Array.from(globalDeleted))
+                );
             } catch {
                 // Non-critical — silently ignore.
             }
@@ -535,6 +548,7 @@ export default function HealthCare() {
         });
 
         setSwipedId(null);
+        window.dispatchEvent(new Event('mindflow:data-changed'));
 
         // Fire the backend delete in the background; any failure is
         // intentionally ignored (no alert, no console output).
@@ -691,9 +705,9 @@ export default function HealthCare() {
                         <button
                             type="button"
                             onClick={() => setFilterDate('')}
-                            className="text-xs font-semibold text-gray-500 hover:text-gray-700 transition"
+                            className="text-s font-semibold text-gray-500 hover:text-gray-700 transition"
                         >
-                            Hamısı
+                            All
                         </button>
                     )}
                     <span className="text-xs font-medium text-gray-400">
@@ -1171,7 +1185,14 @@ function HealthCard({
                             </h3>
                             <p className="text-xs font-medium text-gray-400 mt-0.5">
                                 {record.category}
-                                {record.date && ` • ${formatDisplayDate(record.date)}`}
+                                {record.date && (
+                                    <>
+                                        {' • '}
+                                        <span className="text-gray-500 font-semibold">
+                                            {formatDisplayDate(record.date)}
+                                        </span>
+                                    </>
+                                )}
                             </p>
                         </div>
                     </div>
